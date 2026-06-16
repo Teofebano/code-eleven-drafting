@@ -193,24 +193,22 @@ function render() {
   const subEl = document.getElementById('results-sub');
   const phase = data.phase;
 
-  if (phase === 'lobby' || !phase) {
-    subEl.textContent = 'Draft has not started yet.';
-    document.getElementById('content').innerHTML =
-      '<div class="phase-banner"><span>●</span> Waiting for the draft to begin…</div>';
-    return;
+  const drafted = data.players.filter(p => p.taken_by).length;
+  const total = data.players.length;
+
+  if (phase === 'mcq') {
+    subEl.textContent = 'MCQ round in progress…';
+  } else if (phase === 'draft') {
+    subEl.textContent = `Draft in progress · ${drafted} of ${total} players picked`;
+  } else if (phase === 'done') {
+    subEl.textContent = `Draft complete · ${drafted} players across ${data.captains.length} teams`;
+  } else {
+    subEl.textContent = drafted > 0
+      ? `${drafted} of ${total} players assigned · ${data.captains.length} teams`
+      : `${data.captains.length} teams · ${total} players registered`;
   }
 
-  if (phase === 'mcq' || phase === 'draft') {
-    subEl.textContent = 'Draft is in progress — check back soon.';
-    document.getElementById('content').innerHTML =
-      '<div class="phase-banner"><span>●</span> Draft in progress…</div>' +
-      sortBarHTML() + teamsHTML();
-    attachSortListeners();
-    return;
-  }
-
-  // done or any state — show full results
-  subEl.textContent = `${data.captains.length} teams · ${data.players.filter(p => p.taken_by).length} players drafted`;
+  // always show teams regardless of phase
   document.getElementById('content').innerHTML = sortBarHTML() + teamsHTML() + undraftedHTML();
   attachSortListeners();
 }
