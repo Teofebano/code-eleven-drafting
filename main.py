@@ -30,6 +30,7 @@ TOKEN_EXPIRE_HOURS = 24
 DB_PATH = Path("data/draft.db")
 MCQ_TIMER_SECONDS = 15
 ADMIN_DEFAULT_PASSWORD = os.getenv("ADMIN_PASSWORD", "codeeleven2025")
+PLAYER_ACCESS_KEY = os.getenv("PLAYER_ACCESS_KEY", "players2025")
 
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -247,6 +248,11 @@ async def serve_captain():
     async with aiofiles.open("templates/captain.html", "r") as f:
         return await f.read()
 
+@app.get("/results", response_class=HTMLResponse)
+async def serve_results():
+    async with aiofiles.open("templates/results.html", "r") as f:
+        return await f.read()
+
 # ── AUTH ENDPOINTS ────────────────────────────────────────────────────────
 @app.post("/api/auth/admin-login")
 async def admin_login(username: str = Form(...), password: str = Form(...)):
@@ -272,6 +278,15 @@ async def captain_login(captain_id: str = Form(...), password: str = Form(...)):
     resp.set_cookie("token", token, httponly=True, samesite="lax", max_age=TOKEN_EXPIRE_HOURS*3600)
     return resp
 
+@app.post("/api/auth/player-login")
+async def player_login(access_key: str = Form(...)):
+    if access_key != PLAYER_ACCESS_KEY:
+        raise HTTPException(status_code=401, detail="Invalid access key")
+    token = make_token("player", "player", "Player")
+    resp = JSONResponse({"ok": True})
+    resp.set_cookie("token", token, httponly=True, samesite="lax", max_age=TOKEN_EXPIRE_HOURS*3600)
+    return resp
+
 @app.post("/api/auth/logout")
 async def logout():
     resp = JSONResponse({"ok": True})
@@ -285,7 +300,31 @@ async def me(token: str = Cookie(default=None)):
     data = decode_token(token)
     if not data:
         return JSONResponse({"role": None})
-    return JSONResponse({"role": data.get("role"), "name": data.get("name"), "sub": data.get("sub")})
+    return JSONResponse({"role": data.get("role"), "name": data.get("name"), "sub": data.get("sub"), "ok": True})
+
+# ── PUBLIC RESULTS (player view) ─────────────────────────────────────────
+@app.get("/api/results")
+async def get_results(token: str = Cookie(default=None)):
+    """Read-only endpoint accessible to players, captains, and admins."""
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    data = decode_token(token)
+    if not data or data.get("role") not in ("player", "captain", "admin"):
+        raise HTTPException(status_code=403, detail="Login required")
+    conn = get_db()
+    captains = conn.execute("SELECT id, name FROM captains ORDER BY name").fetchall()
+    players = conn.execute("""
+        SELECT p.id, p.name, p.position, p.batch_year, p.taken_by, c.name as captain_name
+        FROM players p LEFT JOIN captains c ON p.taken_by = c.id
+        ORDER BY p.batch_year
+    """).fetchall()
+    phase = gs_get(conn, "phase", "lobby")
+    conn.close()
+    return {
+        "phase": phase,
+        "captains": [dict(c) for c in captains],
+        "players": [dict(p) for p in players],
+    }
 
 # ── ADMIN — MANAGE ADMINS ─────────────────────────────────────────────────
 @app.get("/api/admins")

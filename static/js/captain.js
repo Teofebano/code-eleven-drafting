@@ -1,5 +1,8 @@
 // ── CONSTANTS ─────────────────────────────────────────────────────────────
 const LETTERS = ['A','B','C','D'];
+const POS_ORDER = { GK: 0, DEF: 1, MID: 2, ATK: 3 };
+const POS_CLASS  = { GK: 'pos-gk', DEF: 'pos-def', MID: 'pos-mid', ATK: 'pos-atk' };
+let currentSort = 'year';
 const GROUP_LABELS = { g1: '≤ 2004', g2: '2005 – 2018', g3: '> 2018' };
 const MCQ_SECONDS = 15;
 
@@ -286,20 +289,69 @@ function doneHTML() {
   </div>`;
 }
 
+function posClass(pos) {
+  return ({ GK:'pos-gk', DEF:'pos-def', MID:'pos-mid', ATK:'pos-atk' })[pos?.toUpperCase()] || 'pos-unknown';
+}
+
+function sortPlayers(players) {
+  const sorted = [...players];
+  if (currentSort === 'position') {
+    const o = { GK:0, DEF:1, MID:2, ATK:3 };
+    sorted.sort((a,b) => {
+      const pa = o[a.position?.toUpperCase()] ?? 99;
+      const pb = o[b.position?.toUpperCase()] ?? 99;
+      return pa !== pb ? pa - pb : a.name.localeCompare(b.name);
+    });
+  } else if (currentSort === 'name') {
+    sorted.sort((a,b) => a.name.localeCompare(b.name));
+  } else {
+    sorted.sort((a,b) => a.batch_year - b.batch_year);
+  }
+  return sorted;
+}
+
+function sortBar() {
+  const labels = { year:'Batch Year', position:'Position', name:'Name' };
+  return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px;background:var(--card);border:1px solid var(--border);border-radius:5px;padding:10px 14px">'
+    + '<span style="font-size:0.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">Sort:</span>'
+    + Object.keys(labels).map(s =>
+        '<button onclick="reSort(' + "'" + s + "'" + ')" style="font-size:0.78rem;font-weight:600;padding:5px 12px;border-radius:3px;cursor:pointer;text-transform:uppercase;letter-spacing:0.4px;border:1.5px solid '
+        + (currentSort===s ? 'var(--lime)' : 'var(--border)') + ';background:'
+        + (currentSort===s ? 'rgba(184,255,63,0.07)' : 'transparent') + ';color:'
+        + (currentSort===s ? 'var(--lime)' : 'var(--muted)') + '">'
+        + labels[s] + '</button>'
+      ).join('')
+    + '</div>';
+}
+
+function reSort(s) {
+  currentSort = s;
+  const wrap = document.getElementById('teams-sort-wrap');
+  if (wrap) wrap.innerHTML = sortBar() + teamsInnerHTML();
+}
+
 function teamsHTML() {
+  return '<div id="teams-sort-wrap">' + sortBar() + teamsInnerHTML() + '</div>';
+}
+
+function teamsInnerHTML() {
   const { captains, players } = gameState || {};
   if (!captains || !captains.length) return '';
-  return `<div class="teams-grid">${captains.map(c => {
-    const myPlayers = (players||[]).filter(p => p.taken_by === c.id);
-    return `<div class="team-col">
-      <div class="team-header">${c.name}<span class="mono" style="font-size:0.78rem;color:var(--muted);font-weight:normal">${myPlayers.length}</span></div>
-      ${myPlayers.length ? myPlayers.map(p => `
-        <div class="team-player">
-          <span>${p.name}</span>
-          <span class="tag-pos">${p.position} · ${p.batch_year}</span>
-        </div>`).join('') : '<div style="font-size:0.8rem;color:var(--muted);padding:6px 0">No picks yet</div>'}
-    </div>`;
-  }).join('')}</div>`;
+  return '<div class="teams-grid">' + captains.map(c => {
+    const myPlayers = sortPlayers((players||[]).filter(p => p.taken_by === c.id));
+    return '<div class="team-col">'
+      + '<div class="team-header">' + c.name + '<span class="mono" style="font-size:0.78rem;color:var(--muted);font-weight:normal">' + myPlayers.length + '</span></div>'
+      + (myPlayers.length
+          ? myPlayers.map(p =>
+              '<div class="team-player"><span>' + p.name + '</span>'
+              + '<div style="display:flex;gap:6px;align-items:center">'
+              + '<span class="pos-badge ' + posClass(p.position) + '">' + (p.position||'?') + '</span>'
+              + '<span class="year-tag">' + p.batch_year + '</span>'
+              + '</div></div>'
+            ).join('')
+          : '<div style="font-size:0.8rem;color:var(--muted);padding:6px 0">No picks yet</div>')
+      + '</div>';
+  }).join('') + '</div>';
 }
 
 // ── ACTIONS ───────────────────────────────────────────────────────────────
@@ -365,3 +417,5 @@ function toast(msg, isError = false) {
 }
 
 init();
+
+// ── SORT HELPERS (injected) ───────────────────────────────────────────────

@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Draft Results — Code Eleven</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/shared.css">
+<style>
+  .main { max-width: 1000px; margin: 0 auto; padding: 28px 20px; }
+
+  .results-hero {
+    text-align: center; padding: 32px 0 24px;
+  }
+  .results-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(2.5rem, 8vw, 5rem);
+    letter-spacing: 3px; line-height: 0.95;
+  }
+  .results-title em { color: var(--lime); font-style: normal; }
+  .results-sub { color: var(--muted); font-size: 0.88rem; margin-top: 10px; }
+
+  .sort-bar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 24px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 5px; padding: 12px 16px;
+  }
+  .sort-label { font-size: 0.75rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .sort-btn {
+    font-family: 'Inter', sans-serif; font-weight: 600; font-size: 0.8rem;
+    padding: 6px 14px; border-radius: 3px; border: 1.5px solid var(--border);
+    background: transparent; color: var(--muted); cursor: pointer;
+    transition: all 0.15s; text-transform: uppercase; letter-spacing: 0.4px;
+  }
+  .sort-btn:hover { border-color: var(--white); color: var(--white); }
+  .sort-btn.active { border-color: var(--lime); color: var(--lime); background: rgba(184,255,63,0.07); }
+
+  .teams-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 18px;
+  }
+  .team-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 6px;
+    overflow: hidden;
+  }
+  .team-card-header {
+    font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; letter-spacing: 1.5px;
+    padding: 14px 18px;
+    background: var(--pitch-light); border-bottom: 2px solid var(--lime);
+    display: flex; justify-content: space-between; align-items: center;
+    color: var(--lime);
+  }
+  .team-card-header .tc-count { font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; color: var(--muted); font-weight: normal; }
+  .team-player-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 9px 18px; border-bottom: 1px solid rgba(45,92,62,0.3);
+    font-size: 0.88rem; transition: background 0.1s;
+  }
+  .team-player-row:last-child { border-bottom: none; }
+  .team-player-row:hover { background: rgba(45,92,62,0.2); }
+  .tp-name { font-weight: 600; }
+  .tp-right { display: flex; align-items: center; gap: 8px; }
+  .pos-badge {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 700;
+    padding: 2px 6px; border-radius: 2px; text-transform: uppercase;
+  }
+  .pos-gk  { background: rgba(255,201,60,0.2);  color: var(--gold); }
+  .pos-def { background: rgba(128,200,255,0.15); color: var(--blue); }
+  .pos-mid { background: rgba(184,255,63,0.13);  color: var(--lime); }
+  .pos-atk { background: rgba(255,77,77,0.15);   color: #ff8080; }
+  .pos-unknown { background: rgba(255,255,255,0.05); color: var(--muted); }
+
+  .year-tag { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--muted); }
+
+  .undrafted-section { margin-top: 28px; }
+  .undrafted-header {
+    font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; letter-spacing: 2px;
+    color: var(--muted); margin-bottom: 14px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--border);
+  }
+  .undrafted-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px;
+  }
+  .undrafted-player {
+    background: var(--card); border: 1px dashed var(--border); border-radius: 4px;
+    padding: 10px 14px; font-size: 0.85rem; opacity: 0.6;
+  }
+
+  .phase-banner {
+    text-align: center; padding: 40px;
+    font-family: 'Bebas Neue', sans-serif; font-size: 2rem;
+    letter-spacing: 2px; color: var(--muted);
+  }
+  .phase-banner span { animation: pulse 1.5s infinite; display: inline-block; }
+
+  @media (max-width: 640px) {
+    .teams-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div id="toast"></div>
+<header>
+  <div class="logo">CODE <span>ELEVEN</span></div>
+  <div class="header-right">
+    <div class="header-badge">Draft Results</div>
+    <button class="btn btn-secondary btn-sm" onclick="logout()">Leave</button>
+  </div>
+</header>
+
+<div class="main">
+  <div class="results-hero">
+    <div class="results-title">SQUAD<em>LIST.</em></div>
+    <div class="results-sub" id="results-sub">Loading…</div>
+  </div>
+
+  <div id="content">
+    <div class="phase-banner"><span>●</span> Loading…</div>
+  </div>
+</div>
+
+<script>
+const POS_ORDER = { GK: 0, DEF: 1, MID: 2, ATK: 3 };
+const POS_CLASS = { GK: 'pos-gk', DEF: 'pos-def', MID: 'pos-mid', ATK: 'pos-atk' };
+let currentSort = 'year'; // 'year' | 'position' | 'name'
+let data = null;
+let ws = null;
+
+async function init() {
+  const me = await fetch('/api/auth/me').then(r => r.json());
+  if (!me.role || !['player','captain','admin'].includes(me.role)) {
+    window.location.href = '/';
+    return;
+  }
+  await loadResults();
+  connectWS();
+}
+
+async function loadResults() {
+  const res = await fetch('/api/results');
+  if (!res.ok) { window.location.href = '/'; return; }
+  data = await res.json();
+  render();
+}
+
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws/draft?token=`);
+  ws.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    if (['player_picked','players_updated','phase_change','reset'].includes(msg.type)) {
+      loadResults();
+    }
+  };
+  ws.onclose = () => setTimeout(connectWS, 2000);
+  setInterval(() => { if (ws.readyState === 1) ws.send('ping'); }, 20000);
+}
+
+function setSort(s) {
+  currentSort = s;
+  document.querySelectorAll('.sort-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.sort === s);
+  });
+  renderTeams();
+}
+
+function posClass(pos) {
+  return POS_CLASS[pos?.toUpperCase()] || 'pos-unknown';
+}
+
+function sortPlayers(players) {
+  const sorted = [...players];
+  if (currentSort === 'year') {
+    sorted.sort((a, b) => a.batch_year - b.batch_year);
+  } else if (currentSort === 'position') {
+    sorted.sort((a, b) => {
+      const pa = POS_ORDER[a.position?.toUpperCase()] ?? 99;
+      const pb = POS_ORDER[b.position?.toUpperCase()] ?? 99;
+      return pa !== pb ? pa - pb : a.name.localeCompare(b.name);
+    });
+  } else if (currentSort === 'name') {
+    sorted.sort((a, b) => a.name.localeCompare(b.name));
+  }
+  return sorted;
+}
+
+function render() {
+  if (!data) return;
+
+  const subEl = document.getElementById('results-sub');
+  const phase = data.phase;
+
+  if (phase === 'lobby' || !phase) {
+    subEl.textContent = 'Draft has not started yet.';
+    document.getElementById('content').innerHTML =
+      '<div class="phase-banner"><span>●</span> Waiting for the draft to begin…</div>';
+    return;
+  }
+
+  if (phase === 'mcq' || phase === 'draft') {
+    subEl.textContent = 'Draft is in progress — check back soon.';
+    document.getElementById('content').innerHTML =
+      '<div class="phase-banner"><span>●</span> Draft in progress…</div>' +
+      sortBarHTML() + teamsHTML();
+    attachSortListeners();
+    return;
+  }
+
+  // done or any state — show full results
+  subEl.textContent = `${data.captains.length} teams · ${data.players.filter(p => p.taken_by).length} players drafted`;
+  document.getElementById('content').innerHTML = sortBarHTML() + teamsHTML() + undraftedHTML();
+  attachSortListeners();
+}
+
+function renderTeams() {
+  const wrap = document.getElementById('teams-wrap');
+  if (wrap) wrap.outerHTML = '<div id="teams-wrap">' + teamsInnerHTML() + '</div>';
+  const udWrap = document.getElementById('undrafted-wrap');
+  if (udWrap) udWrap.innerHTML = undraftedInnerHTML();
+}
+
+function sortBarHTML() {
+  return `<div class="sort-bar">
+    <span class="sort-label">Sort by:</span>
+    <button class="sort-btn ${currentSort==='year'?'active':''}" data-sort="year">Batch Year</button>
+    <button class="sort-btn ${currentSort==='position'?'active':''}" data-sort="position">Position</button>
+    <button class="sort-btn ${currentSort==='name'?'active':''}" data-sort="name">Name</button>
+  </div>`;
+}
+
+function attachSortListeners() {
+  document.querySelectorAll('.sort-btn').forEach(b => {
+    b.addEventListener('click', () => setSort(b.dataset.sort));
+  });
+}
+
+function teamsHTML() {
+  return `<div class="teams-grid" id="teams-wrap">${teamsInnerHTML()}</div>`;
+}
+
+function teamsInnerHTML() {
+  if (!data.captains.length) return '<div class="empty-state">No teams yet.</div>';
+  return data.captains.map(cap => {
+    const myPlayers = sortPlayers(data.players.filter(p => p.taken_by === cap.id));
+    return `<div class="team-card">
+      <div class="team-card-header">
+        ${cap.name}
+        <span class="tc-count">${myPlayers.length} players</span>
+      </div>
+      ${myPlayers.length
+        ? myPlayers.map(p => `
+          <div class="team-player-row">
+            <span class="tp-name">${p.name}</span>
+            <div class="tp-right">
+              <span class="pos-badge ${posClass(p.position)}">${p.position || '?'}</span>
+              <span class="year-tag">${p.batch_year}</span>
+            </div>
+          </div>`).join('')
+        : '<div style="padding:14px 18px;font-size:0.82rem;color:var(--muted)">No players yet</div>'
+      }
+    </div>`;
+  }).join('');
+}
+
+function undraftedHTML() {
+  const undrafted = sortPlayers(data.players.filter(p => !p.taken_by));
+  if (!undrafted.length) return '';
+  return `<div class="undrafted-section">
+    <div class="undrafted-header">Undrafted (${undrafted.length})</div>
+    <div class="undrafted-grid" id="undrafted-wrap">${undraftedInnerHTML()}</div>
+  </div>`;
+}
+
+function undraftedInnerHTML() {
+  const undrafted = sortPlayers(data.players.filter(p => !p.taken_by));
+  return undrafted.map(p => `
+    <div class="undrafted-player">
+      <div style="font-weight:700">${p.name}</div>
+      <div style="display:flex;gap:6px;margin-top:4px;align-items:center">
+        <span class="pos-badge ${posClass(p.position)}">${p.position || '?'}</span>
+        <span class="year-tag">${p.batch_year}</span>
+      </div>
+    </div>`).join('');
+}
+
+function toast(msg, isError = false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show' + (isError ? ' error' : '');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => el.className = '', 2800);
+}
+
+async function logout() {
+  await fetch('/api/auth/logout', { method: 'POST' });
+  window.location.href = '/';
+}
+
+init();
+</script>
+</body>
+</html>

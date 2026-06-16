@@ -187,3 +187,15 @@ tr:hover td { background: rgba(45,92,62,0.18); }
   .card { padding: 16px; }
   .tab { padding: 8px 14px; font-size: 0.95rem; }
 }
+
+/* POSITION BADGES */
+.pos-badge {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 700;
+  padding: 2px 6px; border-radius: 2px; text-transform: uppercase;
+}
+.pos-gk  { background: rgba(255,201,60,0.2);  color: var(--gold); }
+.pos-def { background: rgba(128,200,255,0.15); color: var(--blue); }
+.pos-mid { background: rgba(184,255,63,0.13);  color: var(--lime); }
+.pos-atk { background: rgba(255,77,77,0.15);   color: #ff8080; }
+.pos-unknown { background: rgba(255,255,255,0.05); color: var(--muted); }
+.year-tag { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--muted); }

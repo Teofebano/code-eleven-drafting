@@ -116,10 +116,41 @@
       <button class="btn btn-primary" style="width:100%" onclick="captainLogin()">Join Draft</button>
       <div class="error-msg" id="captain-error"></div>
     </div>
+
+    <!-- PLAYER LOGIN -->
+    <div class="login-card">
+      <div class="lc-icon">👀</div>
+      <div class="lc-title">Player</div>
+      <div class="lc-sub">View the draft results and see which team you're in.</div>
+      <div class="form-group">
+        <label>Access Key</label>
+        <input type="password" id="player-key" placeholder="Enter access key"
+               onkeydown="if(event.key==='Enter')playerLogin()"/>
+      </div>
+      <button class="btn btn-secondary" style="width:100%;margin-top:8px" onclick="playerLogin()">View Results</button>
+      <div class="error-msg" id="player-error"></div>
+    </div>
   </div>
 </div>
 
 <script>
+async function playerLogin() {
+  const key = document.getElementById('player-key').value;
+  const errEl = document.getElementById('player-error');
+  errEl.style.display = 'none';
+  if (!key) { errEl.textContent = 'Enter access key'; errEl.style.display = 'block'; return; }
+  const fd = new FormData();
+  fd.append('access_key', key);
+  const res = await fetch('/api/auth/player-login', { method: 'POST', body: fd });
+  if (res.ok) {
+    window.location.href = '/results';
+  } else {
+    const data = await res.json();
+    errEl.textContent = data.detail || 'Invalid key';
+    errEl.style.display = 'block';
+  }
+}
+
 async function loadCaptains() {
   const res = await fetch('/api/captains');
   const captains = await res.json();
