@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Draft Room — Code Eleven</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/shared.css">
+<style>
+  .main { max-width: 860px; margin: 0 auto; padding: 24px 20px; }
+
+  /* MCQ */
+  .mcq-container { max-width: 600px; margin: 0 auto; }
+  .round-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; font-weight: 700;
+    color: var(--muted); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px;
+  }
+  .mcq-timer {
+    font-family: 'Bebas Neue', sans-serif; font-size: 4rem;
+    color: var(--lime); text-align: center; padding: 8px;
+    text-shadow: 0 0 40px rgba(184,255,63,0.5);
+    transition: color 0.3s;
+  }
+  .mcq-timer.urgent { color: var(--danger); text-shadow: 0 0 40px rgba(255,77,77,0.5); animation: pulse 0.5s infinite; }
+  .question-text { font-size: 1.2rem; font-weight: 600; line-height: 1.55; margin: 18px 0 22px; }
+  .mcq-options { display: flex; flex-direction: column; gap: 11px; }
+  .mcq-btn {
+    display: flex; align-items: center; gap: 14px;
+    background: var(--pitch-mid); border: 1.5px solid var(--border); border-radius: 5px;
+    padding: 14px 18px; cursor: pointer; font-size: 0.95rem;
+    transition: all 0.15s; text-align: left; width: 100%; color: var(--white);
+    font-family: 'Inter', sans-serif; font-weight: 500;
+  }
+  .mcq-btn:hover:not(:disabled) { border-color: var(--lime); background: var(--pitch-light); }
+  .mcq-btn.correct { border-color: var(--lime); background: rgba(184,255,63,0.1); color: var(--lime); }
+  .mcq-btn.wrong   { border-color: var(--danger); background: rgba(255,77,77,0.08); color: var(--danger); }
+  .mcq-btn:disabled { cursor: default; }
+  .opt-letter {
+    font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem;
+    width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid currentColor;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0; opacity: 0.7;
+  }
+
+  /* WAITING */
+  .waiting { text-align: center; padding: 60px 20px; }
+  .waiting-icon { font-size: 3rem; margin-bottom: 16px; }
+  .waiting-title {
+    font-family: 'Bebas Neue', sans-serif; font-size: 2rem;
+    letter-spacing: 2px; color: var(--muted); margin-bottom: 8px;
+  }
+  .waiting-sub { font-size: 0.88rem; color: var(--muted); }
+  .pulse-dot { animation: pulse 1.5s infinite; display: inline-block; }
+
+  /* DRAFT PHASE */
+  .draft-header {
+    font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem;
+    letter-spacing: 2px; padding: 12px 18px; background: var(--pitch-light);
+    border-radius: 4px; margin-bottom: 16px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .draft-header .dh-group { color: var(--lime); }
+
+  .my-turn-banner {
+    background: var(--lime); color: var(--pitch);
+    font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; letter-spacing: 2px;
+    padding: 12px 20px; border-radius: 4px; text-align: center; margin-bottom: 16px;
+    animation: glow 1s ease-in-out infinite alternate;
+  }
+  .waiting-banner {
+    background: var(--card); border: 1px solid var(--border);
+    padding: 12px 20px; border-radius: 4px; text-align: center; margin-bottom: 16px;
+    font-size: 0.9rem; color: var(--muted);
+  }
+  .waiting-banner strong { color: var(--white); }
+
+  .order-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+  .order-chip {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
+    padding: 6px 12px; border-radius: 3px; border: 1.5px solid var(--border); color: var(--muted);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .order-chip.active-pick { border-color: var(--lime); color: var(--lime); font-weight: 700; }
+  .chip-rank { font-family: 'Bebas Neue', sans-serif; font-size: 1rem; }
+
+  .player-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+  .player-card {
+    background: var(--pitch-mid); border: 1.5px solid var(--border); border-radius: 5px;
+    padding: 14px; transition: all 0.15s; cursor: default;
+  }
+  .player-card.pickable { cursor: pointer; }
+  .player-card.pickable:hover { border-color: var(--lime); transform: translateY(-2px); box-shadow: 0 4px 16px rgba(184,255,63,0.15); }
+  .player-card.taken { opacity: 0.3; border-style: dashed; }
+  .pc-name { font-weight: 700; font-size: 0.93rem; margin-bottom: 3px; }
+  .pc-meta { font-size: 0.75rem; color: var(--muted); }
+  .pc-owner { font-size: 0.73rem; font-weight: 700; color: var(--lime); margin-top: 6px; }
+
+  /* TEAMS PANEL */
+  .teams-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+  .team-col { }
+  .team-header {
+    font-family: 'Bebas Neue', sans-serif; font-size: 1.05rem; letter-spacing: 1px; color: var(--lime);
+    padding-bottom: 7px; border-bottom: 2px solid var(--lime); margin-bottom: 10px;
+    display: flex; justify-content: space-between;
+  }
+  .team-player { padding: 7px 0; border-bottom: 1px solid rgba(45,92,62,0.3); display: flex; justify-content: space-between; font-size: 0.84rem; }
+
+  /* RESULTS */
+  .results-header {
+    font-family: 'Bebas Neue', sans-serif; font-size: 2.5rem;
+    letter-spacing: 3px; color: var(--lime); text-align: center; padding: 32px 0 8px;
+  }
+</style>
+</head>
+<body>
+<div id="toast"></div>
+<header>
+  <div class="logo">CODE <span>ELEVEN</span></div>
+  <div class="header-right">
+    <span class="header-user" id="captain-name-header"></span>
+    <div class="header-badge">Draft Room</div>
+    <button class="btn btn-secondary btn-sm" onclick="logout()">Leave</button>
+  </div>
+</header>
+<div class="main" id="main-content">
+  <div class="waiting">
+    <div class="waiting-icon">⚽</div>
+    <div class="waiting-title">Connecting…</div>
+  </div>
+</div>
+
+<script src="/static/js/captain.js"></script>
+</body>
+</html>

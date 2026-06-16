@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Code Eleven — Draft Day</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/shared.css">
+<style>
+  body { display: flex; flex-direction: column; min-height: 100vh; }
+  .hero {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center; padding: 40px 20px;
+    position: relative; z-index: 1;
+  }
+  .pitch-lines {
+    position: fixed; inset: 0; pointer-events: none;
+    background:
+      repeating-linear-gradient(0deg, transparent, transparent 59px, rgba(255,255,255,0.025) 59px, rgba(255,255,255,0.025) 60px),
+      repeating-linear-gradient(90deg, transparent, transparent 59px, rgba(255,255,255,0.015) 59px, rgba(255,255,255,0.015) 60px);
+    z-index: 0;
+  }
+  .center-circle {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 340px; height: 340px;
+    border: 1px solid rgba(255,255,255,0.04);
+    border-radius: 50%;
+    pointer-events: none; z-index: 0;
+  }
+  .logo-big {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(4rem, 14vw, 9rem);
+    line-height: 0.88;
+    letter-spacing: 4px;
+    margin-bottom: 16px;
+  }
+  .logo-big em { color: var(--lime); font-style: normal; display: block; }
+  .tagline {
+    font-size: 0.9rem;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 48px;
+  }
+  .login-cards {
+    display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;
+  }
+  .login-card {
+    background: var(--card);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 32px 28px;
+    width: 280px;
+    text-align: left;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .login-card:hover { border-color: var(--lime); transform: translateY(-3px); }
+  .login-card .lc-icon { font-size: 2rem; margin-bottom: 12px; }
+  .login-card .lc-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.4rem; letter-spacing: 1.5px;
+    margin-bottom: 6px;
+  }
+  .login-card .lc-sub { font-size: 0.82rem; color: var(--muted); margin-bottom: 20px; }
+  .error-msg { color: var(--danger); font-size: 0.82rem; margin-top: 8px; display: none; }
+</style>
+</head>
+<body>
+<div class="pitch-lines"></div>
+<div class="center-circle"></div>
+
+<header>
+  <div class="logo">CODE <span>ELEVEN</span></div>
+  <div class="header-badge">Draft Day</div>
+</header>
+
+<div class="hero">
+  <div class="logo-big">DRAFT<em>DAY.</em></div>
+  <div class="tagline">ITB Informatics &amp; STI Alumni Football · Internal Tournament</div>
+
+  <div class="login-cards">
+    <!-- ADMIN LOGIN -->
+    <div class="login-card">
+      <div class="lc-icon">🛡️</div>
+      <div class="lc-title">Admin</div>
+      <div class="lc-sub">Manage players, questions, and run the draft.</div>
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="admin-username" placeholder="admin" autocomplete="username"/>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="admin-password" placeholder="••••••••"
+               onkeydown="if(event.key==='Enter')adminLogin()"/>
+      </div>
+      <button class="btn btn-primary" style="width:100%" onclick="adminLogin()">Enter Admin</button>
+      <div class="error-msg" id="admin-error"></div>
+    </div>
+
+    <!-- CAPTAIN LOGIN -->
+    <div class="login-card">
+      <div class="lc-icon">⚽</div>
+      <div class="lc-title">Captain</div>
+      <div class="lc-sub">Join the draft and pick your squad.</div>
+      <div class="form-group">
+        <label>Your Name</label>
+        <select id="captain-select"><option value="">Loading captains…</option></select>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="captain-password" placeholder="••••••••"
+               onkeydown="if(event.key==='Enter')captainLogin()"/>
+      </div>
+      <button class="btn btn-primary" style="width:100%" onclick="captainLogin()">Join Draft</button>
+      <div class="error-msg" id="captain-error"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+async function loadCaptains() {
+  const res = await fetch('/api/captains');
+  const captains = await res.json();
+  const sel = document.getElementById('captain-select');
+  sel.innerHTML = '<option value="">— Select your name —</option>';
+  captains.forEach(c => {
+    sel.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+  });
+}
+
+async function adminLogin() {
+  const username = document.getElementById('admin-username').value;
+  const password = document.getElementById('admin-password').value;
+  const errEl = document.getElementById('admin-error');
+  errEl.style.display = 'none';
+
+  const fd = new FormData();
+  fd.append('username', username);
+  fd.append('password', password);
+
+  const res = await fetch('/api/auth/admin-login', { method: 'POST', body: fd });
+  if (res.ok) {
+    window.location.href = '/admin';
+  } else {
+    const data = await res.json();
+    errEl.textContent = data.detail || 'Login failed';
+    errEl.style.display = 'block';
+  }
+}
+
+async function captainLogin() {
+  const captain_id = document.getElementById('captain-select').value;
+  const password = document.getElementById('captain-password').value;
+  const errEl = document.getElementById('captain-error');
+  errEl.style.display = 'none';
+
+  if (!captain_id) { errEl.textContent = 'Select your name'; errEl.style.display = 'block'; return; }
+
+  const fd = new FormData();
+  fd.append('captain_id', captain_id);
+  fd.append('password', password);
+
+  const res = await fetch('/api/auth/captain-login', { method: 'POST', body: fd });
+  if (res.ok) {
+    window.location.href = '/captain';
+  } else {
+    const data = await res.json();
+    errEl.textContent = data.detail || 'Login failed';
+    errEl.style.display = 'block';
+  }
+}
+
+loadCaptains();
+</script>
+</body>
+</html>

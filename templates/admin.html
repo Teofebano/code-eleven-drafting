@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Admin — Code Eleven Draft</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/shared.css">
+<style>
+  .main { max-width: 1100px; margin: 0 auto; padding: 28px 24px; }
+  .inline-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+  .inline-row .form-group { flex: 1; min-width: 140px; margin-bottom: 0; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .order-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  .order-item {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--pitch-mid); border: 1.5px solid var(--border);
+    border-radius: 4px; padding: 10px 14px; cursor: grab;
+  }
+  .order-item.drag-over { border-color: var(--lime); background: var(--pitch-light); }
+  .order-rank { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; color: var(--lime); width: 24px; }
+  .order-name { flex: 1; font-weight: 600; }
+  .answer-log { display: flex; flex-direction: column; gap: 8px; }
+  .answer-entry {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px; background: var(--pitch-mid); border-radius: 4px;
+    border-left: 3px solid var(--border); font-size: 0.88rem;
+  }
+  .answer-entry.rank-1 { border-left-color: var(--gold); }
+  .answer-entry.rank-2 { border-left-color: var(--silver); }
+  .answer-entry.rank-3 { border-left-color: var(--bronze); }
+  .answer-entry.wrong { border-left-color: var(--danger); opacity: 0.5; }
+  .rank-num { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; width: 26px; text-align: center; }
+  .teams-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+  .team-col { }
+  .team-header {
+    font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; letter-spacing: 1px;
+    color: var(--lime); padding-bottom: 8px;
+    border-bottom: 2px solid var(--lime); margin-bottom: 10px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .team-player {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 7px 0; border-bottom: 1px solid rgba(45,92,62,0.3); font-size: 0.85rem;
+  }
+  .csv-hint { font-size: 0.78rem; color: var(--muted); margin-top: 8px; }
+  .csv-hint code { font-family: 'JetBrains Mono', monospace; background: rgba(255,255,255,0.05); padding: 1px 5px; border-radius: 2px; }
+  .phase-banner {
+    font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; letter-spacing: 2px;
+    padding: 10px 18px; background: var(--pitch-light); border-radius: 4px;
+    margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;
+  }
+  .phase-banner .ph-group { color: var(--lime); }
+  .timer-display {
+    font-family: 'Bebas Neue', sans-serif; font-size: 3rem;
+    color: var(--lime); text-align: center; padding: 16px;
+    text-shadow: 0 0 30px rgba(184,255,63,0.6);
+  }
+  .timer-display.urgent { color: var(--danger); text-shadow: 0 0 30px rgba(255,77,77,0.6); animation: pulse 0.5s infinite; }
+</style>
+</head>
+<body>
+<div id="toast"></div>
+
+<header>
+  <div class="logo">CODE <span>ELEVEN</span></div>
+  <div class="header-right">
+    <span class="header-user" id="admin-name"></span>
+    <div class="header-badge">Admin</div>
+    <button class="btn btn-secondary btn-sm" onclick="logout()">Log out</button>
+  </div>
+</header>
+
+<div class="main">
+  <div class="tab-bar">
+    <div class="tab active" data-tab="captains">Captains</div>
+    <div class="tab" data-tab="players">Players</div>
+    <div class="tab" data-tab="questions">Questions</div>
+    <div class="tab" data-tab="control">Draft Control</div>
+    <div class="tab" data-tab="settings">Settings</div>
+  </div>
+
+  <!-- ── CAPTAINS ── -->
+  <div class="tab-panel active" id="tab-captains">
+    <div class="card">
+      <div class="card-title">Add Captain</div>
+      <div class="inline-row">
+        <div class="form-group"><label>Name</label><input id="cap-name" placeholder="Captain name"/></div>
+        <div class="form-group"><label>Password</label><input type="password" id="cap-pw" placeholder="Set password"/></div>
+        <button class="btn btn-primary btn-sm" onclick="addCaptain()">Add</button>
+      </div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="table-wrap" id="captains-table"><div class="empty-state">No captains yet.</div></div>
+    </div>
+  </div>
+
+  <!-- ── PLAYERS ── -->
+  <div class="tab-panel" id="tab-players">
+    <div class="grid-2" style="margin-bottom:0">
+      <div class="card">
+        <div class="card-title">Add Player</div>
+        <div class="form-group"><label>Name</label><input id="pl-name" placeholder="Player name"/></div>
+        <div class="form-group">
+          <label>Position</label>
+          <select id="pl-pos">
+            <option value="GK">GK — Goalkeeper</option>
+            <option value="CB">CB — Centre Back</option>
+            <option value="RB">RB — Right Back</option>
+            <option value="LB">LB — Left Back</option>
+            <option value="CDM">CDM — Defensive Mid</option>
+            <option value="CM">CM — Central Mid</option>
+            <option value="CAM">CAM — Attacking Mid</option>
+            <option value="RW">RW — Right Wing</option>
+            <option value="LW">LW — Left Wing</option>
+            <option value="ST">ST — Striker</option>
+            <option value="CF">CF — Centre Forward</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Batch Year</label><input type="number" id="pl-year" placeholder="e.g. 2015" min="1990" max="2030"/></div>
+        <button class="btn btn-primary" onclick="addPlayer()">Add Player</button>
+      </div>
+      <div class="card">
+        <div class="card-title">Upload CSV</div>
+        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:14px">Upload a CSV to bulk-add players.</p>
+        <div class="form-group">
+          <label>CSV File</label>
+          <input type="file" id="csv-file" accept=".csv" style="padding:8px"/>
+        </div>
+        <button class="btn btn-secondary" onclick="uploadCSV()">Upload Players</button>
+        <div class="csv-hint" style="margin-top:12px">
+          Required columns (any order, flexible naming):<br>
+          <code>name</code> · <code>batch_year</code> · <code>position</code><br><br>
+          Example:<br>
+          <code>name,batch_year,position</code><br>
+          <code>Budi Santoso,2012,CM</code>
+        </div>
+        <div id="csv-result" style="margin-top:12px;font-size:0.82rem"></div>
+      </div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border)">
+        <span class="card-title" style="margin-bottom:0" id="players-count">Players</span>
+        <button class="btn btn-danger btn-sm" onclick="clearPlayers()">Clear All</button>
+      </div>
+      <div class="table-wrap" id="players-table"><div class="empty-state">No players yet.</div></div>
+    </div>
+  </div>
+
+  <!-- ── QUESTIONS ── -->
+  <div class="tab-panel" id="tab-questions">
+    <div class="card">
+      <div class="card-title">Add Question</div>
+      <div class="form-group"><label>Question</label><textarea id="q-text" placeholder="e.g. Who won the 2006 FIFA World Cup?"></textarea></div>
+      <div class="grid-2">
+        <div class="form-group"><label>Option A</label><input class="q-opt" placeholder="Option A"/></div>
+        <div class="form-group"><label>Option B</label><input class="q-opt" placeholder="Option B"/></div>
+        <div class="form-group"><label>Option C</label><input class="q-opt" placeholder="Option C"/></div>
+        <div class="form-group"><label>Option D</label><input class="q-opt" placeholder="Option D"/></div>
+      </div>
+      <div class="form-group" style="max-width:200px">
+        <label>Correct Answer</label>
+        <select id="q-correct">
+          <option value="0">A</option><option value="1">B</option>
+          <option value="2">C</option><option value="3">D</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="addQuestion()">Add Question</button>
+    </div>
+    <div id="questions-list"><div class="empty-state">No questions yet.</div></div>
+  </div>
+
+  <!-- ── DRAFT CONTROL ── -->
+  <div class="tab-panel" id="tab-control">
+    <div class="status-bar" id="status-bar">
+      <span><span class="status-dot"></span> Live</span>
+      <span>Phase: <strong id="st-phase">lobby</strong></span>
+      <span>Group: <strong id="st-group">—</strong></span>
+      <span>Picks: <strong id="st-picks">0</strong></span>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">Round Control</div>
+        <p style="font-size:0.83rem;color:var(--muted);margin-bottom:16px">
+          3 rounds — one per batch group. Each round: MCQ buzzer → draft order → player picks.
+        </p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-primary" id="btn-start-round" onclick="startRound()">▶ Start Next Round</button>
+          <button class="btn btn-secondary" onclick="endDraft()">End Draft</button>
+          <button class="btn btn-danger btn-sm" onclick="resetDraft()">Reset Draft</button>
+        </div>
+        <div class="divider"></div>
+        <div style="display:flex;gap:10px">
+          <a href="/api/export/history" class="btn btn-secondary btn-sm">⬇ Export History CSV</a>
+          <a href="/api/export/teams" class="btn btn-secondary btn-sm">⬇ Export Teams CSV</a>
+        </div>
+      </div>
+
+      <div class="card" id="mcq-panel" style="display:none">
+        <div class="card-title">Active MCQ</div>
+        <div class="timer-display" id="admin-timer">—</div>
+        <div id="admin-question" style="font-size:0.95rem;font-weight:600;margin-bottom:8px"></div>
+        <div id="admin-options" style="font-size:0.85rem;color:var(--muted)"></div>
+      </div>
+    </div>
+
+    <!-- draft order override -->
+    <div class="card" id="order-override-card" style="display:none">
+      <div class="card-title">Draft Order Override</div>
+      <p style="font-size:0.83rem;color:var(--muted);margin-bottom:14px">Drag to reorder. Only captains who answered correctly are included.</p>
+      <ul class="order-list" id="order-list"></ul>
+      <button class="btn btn-primary" style="margin-top:14px" onclick="applyDraftOrder()">Apply Order & Start Draft</button>
+    </div>
+
+    <!-- answer log -->
+    <div class="card">
+      <div class="card-title">MCQ Answer Log</div>
+      <div id="answer-log"><div class="empty-state">No answers yet.</div></div>
+    </div>
+
+    <!-- live teams -->
+    <div class="card">
+      <div class="card-title">Live Teams</div>
+      <div id="live-teams"><div class="empty-state">No picks yet.</div></div>
+    </div>
+
+    <!-- pick history -->
+    <div class="card">
+      <div class="card-title">Pick History</div>
+      <div class="table-wrap" id="pick-history"><div class="empty-state">No picks yet.</div></div>
+    </div>
+  </div>
+
+  <!-- ── SETTINGS ── -->
+  <div class="tab-panel" id="tab-settings">
+    <div class="card" style="max-width:500px">
+      <div class="card-title">Add Admin Account</div>
+      <div class="form-group"><label>Username</label><input id="new-admin-user" placeholder="username"/></div>
+      <div class="form-group"><label>Password</label><input type="password" id="new-admin-pw" placeholder="password"/></div>
+      <button class="btn btn-primary" onclick="addAdmin()">Add Admin</button>
+    </div>
+    <div class="card" style="max-width:500px;padding:0;overflow:hidden">
+      <div class="table-wrap" id="admins-table"><div class="empty-state">Loading…</div></div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/admin.js"></script>
+</body>
+</html>
