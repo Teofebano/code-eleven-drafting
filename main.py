@@ -447,6 +447,26 @@ async def clear_players(auth=Depends(require_admin)):
     await mgr.broadcast("draft", {"type": "players_updated"})
     return {"ok": True}
 
+# ── ADMIN — ASSIGN PLAYER ────────────────────────────────────────────────
+@app.put("/api/players/{player_id}/assign")
+async def assign_player(player_id: str, body: dict, auth=Depends(require_admin)):
+    captain_id = body.get("captain_id")  # None = unassign
+    conn = get_db()
+    player = conn.execute("SELECT * FROM players WHERE id=?", (player_id,)).fetchone()
+    if not player:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Player not found")
+    if captain_id:
+        cap = conn.execute("SELECT id FROM captains WHERE id=?", (captain_id,)).fetchone()
+        if not cap:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Captain not found")
+    conn.execute("UPDATE players SET taken_by=? WHERE id=?", (captain_id, player_id))
+    conn.commit()
+    conn.close()
+    await mgr.broadcast("draft", {"type": "players_updated"})
+    return {"ok": True}
+
 # ── ADMIN — QUESTIONS ─────────────────────────────────────────────────────
 @app.get("/api/questions")
 async def list_questions(auth=Depends(require_admin)):
@@ -810,6 +830,156 @@ async def export_teams(auth=Depends(require_admin)):
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=teams.csv"}
     )
+
+
+# ── RESTORE FROM EXPORT ───────────────────────────────────────────────────
+@app.post("/api/restore/teams")
+async def restore_from_teams_csv(file: UploadFile = File(...), auth=Depends(require_admin)):
+    """
+    Restore players + captain assignments from the teams.csv export.
+    Columns: Captain, Player, Position, Batch Year, Group
+    - Creates players that don't exist yet (matched by name+year+position)
+    - Assigns them to captains matched by name
+    - Captains must already exist in the DB
+    - 'Undrafted' captain column = player added but unassigned
+    """
+    content = await file.read()
+    try:
+        text = content.decode("utf-8-sig")
+        reader = csv.DictReader(io.StringIO(text))
+        rows = list(reader)
+        if not rows:
+            raise HTTPException(status_code=400, detail="CSV is empty")
+
+        conn = get_db()
+        captains = {c["name"]: c["id"] for c in conn.execute("SELECT id, name FROM captains").fetchall()}
+        existing_players = {
+            (p["name"].strip().lower(), str(p["batch_year"])): p["id"]
+            for p in conn.execute("SELECT id, name, batch_year FROM players").fetchall()
+        }
+
+        added = 0
+        assigned = 0
+        skipped = []
+
+        for i, row in enumerate(rows, 1):
+            try:
+                # flexible column names
+                captain_name = (row.get("Captain") or row.get("captain") or "").strip()
+                player_name  = (row.get("Player")  or row.get("player")  or row.get("name") or "").strip()
+                position     = (row.get("Position") or row.get("position") or row.get("pos") or "").strip().upper()
+                batch_year   = int((row.get("Batch Year") or row.get("batch_year") or row.get("year") or "0").strip())
+
+                if not player_name or not batch_year:
+                    skipped.append(f"Row {i}: missing player name or year")
+                    continue
+
+                # find or create player
+                key = (player_name.lower(), str(batch_year))
+                if key in existing_players:
+                    player_id = existing_players[key]
+                else:
+                    player_id = str(uuid.uuid4())
+                    conn.execute("INSERT INTO players (id, name, position, batch_year) VALUES (?,?,?,?)",
+                                 (player_id, player_name, position or "?", batch_year))
+                    existing_players[key] = player_id
+                    added += 1
+
+                # assign to captain
+                captain_id = None
+                if captain_name and captain_name.lower() != "undrafted":
+                    captain_id = captains.get(captain_name)
+                    if not captain_id:
+                        skipped.append(f"Row {i}: captain '{captain_name}' not found — player added unassigned")
+                    else:
+                        assigned += 1
+
+                conn.execute("UPDATE players SET taken_by=? WHERE id=?", (captain_id, player_id))
+
+            except Exception as e:
+                skipped.append(f"Row {i}: {e}")
+
+        conn.commit()
+        conn.close()
+        await mgr.broadcast("draft", {"type": "players_updated"})
+        return {"ok": True, "added": added, "assigned": assigned, "skipped": skipped}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Parse error: {e}")
+
+
+@app.post("/api/restore/history")
+async def restore_from_history_csv(file: UploadFile = File(...), auth=Depends(require_admin)):
+    """
+    Restore draft history from history.csv export.
+    Columns: Pick #, Captain, Player, Position, Batch Year, Group, Picked At
+    Rebuilds the draft_history table entries only (does not reassign players — run teams restore first).
+    """
+    content = await file.read()
+    try:
+        text = content.decode("utf-8-sig")
+        reader = csv.DictReader(io.StringIO(text))
+        rows = list(reader)
+        if not rows:
+            raise HTTPException(status_code=400, detail="CSV is empty")
+
+        group_map = {"≤2004": "g1", "2005-2018": "g2", ">2018": "g3"}
+        conn = get_db()
+
+        captains_by_name = {c["name"]: c["id"] for c in conn.execute("SELECT id, name FROM captains").fetchall()}
+        players_by_key   = {
+            (p["name"].strip().lower(), str(p["batch_year"])): p["id"]
+            for p in conn.execute("SELECT id, name, batch_year FROM players").fetchall()
+        }
+
+        # clear existing history before restoring
+        conn.execute("DELETE FROM draft_history")
+
+        restored = 0
+        skipped = []
+
+        for i, row in enumerate(rows, 1):
+            try:
+                pick_num     = int((row.get("Pick #") or row.get("pick_number") or "0").strip())
+                captain_name = (row.get("Captain") or "").strip()
+                player_name  = (row.get("Player")  or "").strip()
+                position     = (row.get("Position") or row.get("Pos") or "").strip()
+                batch_year   = int((row.get("Batch Year") or row.get("batch_year") or "0").strip())
+                group_raw    = (row.get("Group") or "").strip()
+                picked_at    = (row.get("Picked At") or row.get("picked_at") or "").strip()
+
+                captain_id = captains_by_name.get(captain_name)
+                player_id  = players_by_key.get((player_name.lower(), str(batch_year)))
+                group_id   = group_map.get(group_raw, "g1")
+
+                if not captain_id:
+                    skipped.append(f"Row {i}: captain '{captain_name}' not found")
+                    continue
+                if not player_id:
+                    skipped.append(f"Row {i}: player '{player_name}' ({batch_year}) not found — run teams restore first")
+                    continue
+
+                conn.execute("""INSERT OR IGNORE INTO draft_history
+                    (id, captain_id, captain_name, player_id, player_name, player_position, player_year, group_id, pick_number, picked_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                    (str(uuid.uuid4()), captain_id, captain_name,
+                     player_id, player_name, position, batch_year,
+                     group_id, pick_num, picked_at or None))
+                restored += 1
+
+            except Exception as e:
+                skipped.append(f"Row {i}: {e}")
+
+        conn.commit()
+        conn.close()
+        return {"ok": True, "restored": restored, "skipped": skipped}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Parse error: {e}")
 
 # ── WEBSOCKET ─────────────────────────────────────────────────────────────
 @app.websocket("/ws/draft")

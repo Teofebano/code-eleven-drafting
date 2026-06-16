@@ -235,6 +235,47 @@
 
   <!-- ── SETTINGS ── -->
   <div class="tab-panel" id="tab-settings">
+
+    <div class="card" style="max-width:600px">
+      <div class="card-title">Restore from Export</div>
+      <p style="font-size:0.85rem;color:var(--muted);margin-bottom:18px">
+        Use the CSVs you downloaded to rebuild players and team assignments after a reset.
+        Run <strong style="color:var(--white)">Step 1 first</strong>, then Step 2.
+      </p>
+
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div style="background:var(--pitch-mid);border:1px solid var(--border);border-radius:5px;padding:16px">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:1px;color:var(--lime);margin-bottom:6px">
+            Step 1 — Restore Players &amp; Assignments
+          </div>
+          <div style="font-size:0.8rem;color:var(--muted);margin-bottom:12px">
+            Upload <code style="background:rgba(255,255,255,0.05);padding:1px 5px;border-radius:2px">teams.csv</code>
+            — adds all players and assigns them to captains. Captains must already exist.
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <input type="file" id="restore-teams-file" accept=".csv" style="padding:6px;flex:1;min-width:180px"/>
+            <button class="btn btn-primary btn-sm" onclick="restoreTeams()">Upload teams.csv</button>
+          </div>
+          <div id="restore-teams-result" style="margin-top:10px;font-size:0.8rem"></div>
+        </div>
+
+        <div style="background:var(--pitch-mid);border:1px solid var(--border);border-radius:5px;padding:16px">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:1px;color:var(--lime);margin-bottom:6px">
+            Step 2 — Restore Draft History (optional)
+          </div>
+          <div style="font-size:0.8rem;color:var(--muted);margin-bottom:12px">
+            Upload <code style="background:rgba(255,255,255,0.05);padding:1px 5px;border-radius:2px">draft-history.csv</code>
+            — rebuilds the pick log. Run Step 1 first.
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <input type="file" id="restore-history-file" accept=".csv" style="padding:6px;flex:1;min-width:180px"/>
+            <button class="btn btn-secondary btn-sm" onclick="restoreHistory()">Upload draft-history.csv</button>
+          </div>
+          <div id="restore-history-result" style="margin-top:10px;font-size:0.8rem"></div>
+        </div>
+      </div>
+    </div>
+
     <div class="card" style="max-width:500px">
       <div class="card-title">Add Admin Account</div>
       <div class="form-group"><label>Username</label><input id="new-admin-user" placeholder="username"/></div>

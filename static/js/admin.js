@@ -202,6 +202,16 @@ async function deletePlayer(id) {
   loadPlayers();
 }
 
+async function assignPlayer(playerId, captainId) {
+  await fetch(`/api/players/${playerId}/assign`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ captain_id: captainId || null }),
+  });
+  loadPlayers();
+  loadGame();
+}
+
 async function clearPlayers() {
   if (!confirm('Remove ALL players? This cannot be undone.')) return;
   await fetch('/api/players', { method: 'DELETE' });
@@ -214,16 +224,24 @@ function renderPlayersTable(players) {
   const countEl = document.getElementById('players-count');
   if (countEl) countEl.textContent = `Players (${players.length})`;
   if (!players.length) { el.innerHTML = '<div class="empty-state" style="padding:32px">No players yet.</div>'; return; }
+  const caps = gameState ? (gameState.captains || []) : [];
   el.innerHTML = `<table>
-    <thead><tr><th>Name</th><th>Pos</th><th>Year</th><th>Group</th><th>Picked by</th><th></th></tr></thead>
+    <thead><tr><th>Name</th><th>Pos</th><th>Year</th><th>Group</th><th>Assign to</th><th></th></tr></thead>
     <tbody>${players.map(p => {
       const g = getGroup(p.batch_year);
+      const opts = '<option value="">— Unassigned —</option>' +
+        caps.map(c => `<option value="${c.id}" ${p.taken_by===c.id?'selected':''}>${c.name}</option>`).join('');
       return `<tr>
         <td><strong>${p.name}</strong></td>
         <td><span class="tag-pos">${p.position}</span></td>
         <td class="mono">${p.batch_year}</td>
         <td><span class="badge ${GROUP_BADGE[g]}">${GROUP_LABELS[g]}</span></td>
-        <td style="color:${p.taken_by ? 'var(--lime)' : 'var(--muted)'}">${p.captain_name || '—'}</td>
+        <td>
+          <select style="padding:5px 8px;font-size:0.8rem;width:100%;min-width:130px"
+            onchange="assignPlayer('${p.id}', this.value)">
+            ${opts}
+          </select>
+        </td>
         <td><button class="btn btn-danger btn-sm" onclick="deletePlayer('${p.id}')">✕</button></td>
       </tr>`;
     }).join('')}</tbody></table>`;
@@ -492,6 +510,43 @@ function renderAdminsTable(admins) {
         <td><button class="btn btn-danger btn-sm" onclick="deleteAdmin('${a.id}')">✕</button></td>
       </tr>`).join('')}
     </tbody></table>`;
+}
+
+// ── RESTORE ───────────────────────────────────────────────────────────────
+async function restoreTeams() {
+  const file = document.getElementById('restore-teams-file').files[0];
+  if (!file) { toast('Select teams.csv first', true); return; }
+  const fd = new FormData(); fd.append('file', file);
+  const res = await fetch('/api/restore/teams', { method: 'POST', body: fd });
+  const data = await res.json();
+  const el = document.getElementById('restore-teams-result');
+  if (res.ok) {
+    el.innerHTML = `<span class="text-lime">✓ Added ${data.added} players, assigned ${data.assigned}.</span>` +
+      (data.skipped.length ? `<br><span class="text-danger">Skipped: ${data.skipped.join(' · ')}</span>` : '');
+    toast(`Restored: ${data.added} players, ${data.assigned} assignments`);
+    loadAll();
+  } else {
+    el.innerHTML = `<span class="text-danger">Error: ${data.detail}</span>`;
+    toast('Restore failed', true);
+  }
+}
+
+async function restoreHistory() {
+  const file = document.getElementById('restore-history-file').files[0];
+  if (!file) { toast('Select draft-history.csv first', true); return; }
+  const fd = new FormData(); fd.append('file', file);
+  const res = await fetch('/api/restore/history', { method: 'POST', body: fd });
+  const data = await res.json();
+  const el = document.getElementById('restore-history-result');
+  if (res.ok) {
+    el.innerHTML = `<span class="text-lime">✓ Restored ${data.restored} history entries.</span>` +
+      (data.skipped.length ? `<br><span class="text-danger">Skipped: ${data.skipped.join(' · ')}</span>` : '');
+    toast(`History restored: ${data.restored} entries`);
+    loadGame();
+  } else {
+    el.innerHTML = `<span class="text-danger">Error: ${data.detail}</span>`;
+    toast('History restore failed', true);
+  }
 }
 
 // ── LOGOUT ────────────────────────────────────────────────────────────────
