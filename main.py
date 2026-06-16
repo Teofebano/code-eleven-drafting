@@ -192,13 +192,19 @@ async def mcq_countdown(round_id: str, group_id: str):
         if phase != "mcq":
             return
 
-        # lock answers, compute draft order
+        # lock answers, compute draft order:
+        # 1st: correct answers sorted fastest to slowest
+        # 2nd: wrong answers sorted fastest to slowest
+        # 3rd: captains who did not answer at all
         answers = conn.execute(
             "SELECT * FROM mcq_answers WHERE round_id=?", (round_id,)
         ).fetchall()
-        correct = [a for a in answers if a["is_correct"]]
-        correct_sorted = sorted(correct, key=lambda a: a["answered_at_ms"])
-        order = [a["captain_id"] for a in correct_sorted]
+        correct  = sorted([a for a in answers if a["is_correct"]],     key=lambda a: a["answered_at_ms"])
+        wrong    = sorted([a for a in answers if not a["is_correct"]], key=lambda a: a["answered_at_ms"])
+        all_caps = [r["id"] for r in conn.execute("SELECT id FROM captains").fetchall()]
+        answered_ids = {a["captain_id"] for a in answers}
+        no_answer = [cid for cid in all_caps if cid not in answered_ids]
+        order = [a["captain_id"] for a in correct] + [a["captain_id"] for a in wrong] + no_answer
 
         gs_set(conn, "draft_order", order)
         gs_set(conn, "current_picker_index", 0)
