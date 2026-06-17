@@ -291,11 +291,17 @@ async function addFixture(){
   const home=document.getElementById('fixture-home').value;
   const away=document.getElementById('fixture-away').value;
   const date=document.getElementById('fixture-date').value;
+  const pitchName=document.getElementById('fixture-pitch-name').value.trim();
+  const pitchUrl=document.getElementById('fixture-pitch-url').value.trim();
   if(!home||!away){toast('Select both teams',true);return;}
   if(home===away){toast('Teams must be different',true);return;}
-  const fd=new FormData();fd.append('home_captain_id',home);fd.append('away_captain_id',away);fd.append('match_date',date);
+  const fd=new FormData();
+  fd.append('home_captain_id',home);fd.append('away_captain_id',away);fd.append('match_date',date);
+  fd.append('pitch_name',pitchName);fd.append('pitch_url',pitchUrl);
   await fetch(`/api/events/${eid}/fixtures`,{method:'POST',body:fd});
   toast('Fixture added');
+  document.getElementById('fixture-pitch-name').value='';
+  document.getElementById('fixture-pitch-url').value='';
 }
 
 async function deleteFixture(fid){
@@ -352,7 +358,8 @@ function renderFixtures(){
         </span>
         <span style="font-weight:700;flex:1">${f.away_name}</span>
       </div>
-      <div style="display:flex;gap:6px;flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        ${f.pitch_name?`<a href="${f.pitch_url||'#'}" target="_blank" style="font-size:.75rem;color:var(--muted);text-decoration:none;border:1px solid var(--border);border-radius:3px;padding:3px 8px" title="${f.pitch_url||'No link'}">📍 ${f.pitch_name}</a>`:''}
         <button class="btn btn-primary btn-sm" onclick="setResult('${f.id}')">Score</button>
         <button class="btn btn-secondary btn-sm" onclick="openEventModal('${f.id}')">Events</button>
         <button class="btn btn-danger btn-sm" onclick="deleteFixture('${f.id}')">✕</button>

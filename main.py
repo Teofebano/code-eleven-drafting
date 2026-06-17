@@ -113,6 +113,8 @@ def init_db():
         home_score INTEGER DEFAULT NULL,
         away_score INTEGER DEFAULT NULL,
         status TEXT DEFAULT 'scheduled',
+        pitch_name TEXT DEFAULT NULL,
+        pitch_url TEXT DEFAULT NULL,
         created_at TEXT DEFAULT (datetime('now'))
     );
     CREATE TABLE IF NOT EXISTS fixture_events (
@@ -125,6 +127,16 @@ def init_db():
         minute INTEGER DEFAULT NULL
     );
     """)
+    # Add pitch columns to fixtures if missing
+    try:
+        fx_cols = [r[1] for r in c.execute("PRAGMA table_info(fixtures)").fetchall()]
+        if fx_cols and "pitch_name" not in fx_cols:
+            c.execute("ALTER TABLE fixtures ADD COLUMN pitch_name TEXT DEFAULT NULL")
+        if fx_cols and "pitch_url" not in fx_cols:
+            c.execute("ALTER TABLE fixtures ADD COLUMN pitch_url TEXT DEFAULT NULL")
+    except Exception as e:
+        print(f"Fixtures schema fix note: {e}")
+
     # ── SCHEMA MIGRATIONS (safe to run repeatedly) ──────────────────────────
     # Fix events table: add missing columns from old schema
     try:
@@ -850,10 +862,10 @@ async def list_fixtures(eid: str, token: str = Cookie(default=None)):
 
 @app.post("/api/events/{eid}/fixtures")
 async def create_fixture(eid: str, home_captain_id: str=Form(...), away_captain_id: str=Form(...),
-                          match_date: str=Form(default=""), auth=Depends(require_admin)):
+                          match_date: str=Form(default=""), pitch_name: str=Form(default=""), pitch_url: str=Form(default=""), auth=Depends(require_admin)):
     conn=get_db(); fid=str(uuid.uuid4())
-    conn.execute("INSERT INTO fixtures(id,event_id,home_captain_id,away_captain_id,match_date) VALUES(?,?,?,?,?)",
-                 (fid,eid,home_captain_id,away_captain_id,match_date or None))
+    conn.execute("INSERT INTO fixtures(id,event_id,home_captain_id,away_captain_id,match_date,pitch_name,pitch_url) VALUES(?,?,?,?,?,?,?)",
+                 (fid,eid,home_captain_id,away_captain_id,match_date or None,pitch_name.strip() or None,pitch_url.strip() or None))
     conn.commit(); conn.close()
     await mgr.broadcast(f"event:{eid}",{"type":"fixtures_updated"})
     return {"ok":True,"id":fid}
