@@ -1,209 +1,115 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Code Eleven — Draft Day</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/css/shared.css">
 <style>
-  body { display: flex; flex-direction: column; min-height: 100vh; }
-  .hero {
-    flex: 1; display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    text-align: center; padding: 40px 20px;
-    position: relative; z-index: 1;
-  }
-  .pitch-lines {
-    position: fixed; inset: 0; pointer-events: none;
-    background:
-      repeating-linear-gradient(0deg, transparent, transparent 59px, rgba(255,255,255,0.025) 59px, rgba(255,255,255,0.025) 60px),
-      repeating-linear-gradient(90deg, transparent, transparent 59px, rgba(255,255,255,0.015) 59px, rgba(255,255,255,0.015) 60px);
-    z-index: 0;
-  }
-  .center-circle {
-    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    width: 340px; height: 340px;
-    border: 1px solid rgba(255,255,255,0.04);
-    border-radius: 50%;
-    pointer-events: none; z-index: 0;
-  }
-  .logo-big {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: clamp(4rem, 14vw, 9rem);
-    line-height: 0.88;
-    letter-spacing: 4px;
-    margin-bottom: 16px;
-  }
-  .logo-big em { color: var(--lime); font-style: normal; display: block; }
-  .tagline {
-    font-size: 0.9rem;
-    color: var(--muted);
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    margin-bottom: 48px;
-  }
-  .login-cards {
-    display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;
-  }
-  .login-card {
-    background: var(--card);
-    border: 1.5px solid var(--border);
-    border-radius: 8px;
-    padding: 32px 28px;
-    width: 280px;
-    text-align: left;
-    transition: border-color 0.2s, transform 0.2s;
-  }
-  .login-card:hover { border-color: var(--lime); transform: translateY(-3px); }
-  .login-card .lc-icon { font-size: 2rem; margin-bottom: 12px; }
-  .login-card .lc-title {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 1.4rem; letter-spacing: 1.5px;
-    margin-bottom: 6px;
-  }
-  .login-card .lc-sub { font-size: 0.82rem; color: var(--muted); margin-bottom: 20px; }
-  .error-msg { color: var(--danger); font-size: 0.82rem; margin-top: 8px; display: none; }
+  body{display:flex;flex-direction:column;min-height:100vh;}
+  .pitch-lines{position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,transparent,transparent 59px,rgba(255,255,255,.025) 59px,rgba(255,255,255,.025) 60px),repeating-linear-gradient(90deg,transparent,transparent 59px,rgba(255,255,255,.015) 59px,rgba(255,255,255,.015) 60px);z-index:0;}
+  .center-circle{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:340px;height:340px;border:1px solid rgba(255,255,255,.04);border-radius:50%;pointer-events:none;z-index:0;}
+  .hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 20px;position:relative;z-index:1;}
+  .logo-big{font-family:'Bebas Neue',sans-serif;font-size:clamp(4rem,14vw,9rem);line-height:.88;letter-spacing:4px;margin-bottom:16px;}
+  .logo-big em{color:var(--lime);font-style:normal;display:block;}
+  .tagline{font-size:.9rem;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:48px;}
+  .login-cards{display:flex;gap:20px;flex-wrap:wrap;justify-content:center;}
+  .login-card{background:var(--card);border:1.5px solid var(--border);border-radius:8px;padding:28px 24px;width:260px;text-align:left;transition:border-color .2s,transform .2s;}
+  .login-card:hover{border-color:var(--lime);transform:translateY(-3px);}
+  .lc-icon{font-size:2rem;margin-bottom:10px;}
+  .lc-title{font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:1.5px;margin-bottom:4px;}
+  .lc-sub{font-size:.8rem;color:var(--muted);margin-bottom:18px;}
+  .error-msg{color:var(--danger);font-size:.8rem;margin-top:8px;display:none;}
 </style>
 </head>
 <body>
-<div class="pitch-lines"></div>
-<div class="center-circle"></div>
-
+<div class="pitch-lines"></div><div class="center-circle"></div>
+<div id="toast"></div>
 <header>
   <div class="logo">CODE <span>ELEVEN</span></div>
   <div class="header-badge">Draft Day</div>
 </header>
-
 <div class="hero">
   <div class="logo-big">DRAFT<em>DAY.</em></div>
   <div class="tagline">ITB Informatics &amp; STI Alumni Football · Internal Tournament</div>
-
   <div class="login-cards">
-    <!-- ADMIN LOGIN -->
+    <!-- ADMIN -->
     <div class="login-card">
       <div class="lc-icon">🛡️</div>
       <div class="lc-title">Admin</div>
-      <div class="lc-sub">Manage players, questions, and run the draft.</div>
-      <div class="form-group">
-        <label>Username</label>
-        <input type="text" id="admin-username" placeholder="admin" autocomplete="username"/>
-      </div>
-      <div class="form-group">
-        <label>Password</label>
-        <input type="password" id="admin-password" placeholder="••••••••"
-               onkeydown="if(event.key==='Enter')adminLogin()"/>
-      </div>
+      <div class="lc-sub">Manage events, players, and run the draft.</div>
+      <div class="form-group"><label>Username</label><input type="text" id="admin-user" placeholder="admin"/></div>
+      <div class="form-group"><label>Password</label><input type="password" id="admin-pw" placeholder="••••••••" onkeydown="if(event.key==='Enter')adminLogin()"/></div>
       <button class="btn btn-primary" style="width:100%" onclick="adminLogin()">Enter Admin</button>
-      <div class="error-msg" id="admin-error"></div>
+      <div class="error-msg" id="admin-err"></div>
     </div>
-
-    <!-- CAPTAIN LOGIN -->
+    <!-- CAPTAIN -->
     <div class="login-card">
       <div class="lc-icon">⚽</div>
       <div class="lc-title">Captain</div>
-      <div class="lc-sub">Join the draft and pick your squad.</div>
-      <div class="form-group">
-        <label>Your Name</label>
-        <select id="captain-select"><option value="">Loading captains…</option></select>
-      </div>
-      <div class="form-group">
-        <label>Password</label>
-        <input type="password" id="captain-password" placeholder="••••••••"
-               onkeydown="if(event.key==='Enter')captainLogin()"/>
-      </div>
+      <div class="lc-sub">Join your event and draft your squad.</div>
+      <div class="form-group"><label>Event Code</label><input type="text" id="cap-code" placeholder="e.g. ABC123" style="text-transform:uppercase" oninput="loadCaptainsForCode(this.value)"/></div>
+      <div class="form-group"><label>Your Name</label><select id="cap-select"><option value="">— Enter code first —</option></select></div>
+      <div class="form-group"><label>Password</label><input type="password" id="cap-pw" placeholder="••••••••" onkeydown="if(event.key==='Enter')captainLogin()"/></div>
       <button class="btn btn-primary" style="width:100%" onclick="captainLogin()">Join Draft</button>
-      <div class="error-msg" id="captain-error"></div>
+      <div class="error-msg" id="cap-err"></div>
     </div>
-
-    <!-- PLAYER LOGIN -->
+    <!-- VIEWER -->
     <div class="login-card">
       <div class="lc-icon">👀</div>
-      <div class="lc-title">Player</div>
-      <div class="lc-sub">View the draft results and see which team you're in.</div>
-      <div class="form-group">
-        <label>Access Key</label>
-        <input type="password" id="player-key" placeholder="Enter access key"
-               onkeydown="if(event.key==='Enter')playerLogin()"/>
-      </div>
-      <button class="btn btn-secondary" style="width:100%;margin-top:8px" onclick="playerLogin()">View Results</button>
-      <div class="error-msg" id="player-error"></div>
+      <div class="lc-title">View Results</div>
+      <div class="lc-sub">See squad lists and tournament table.</div>
+      <div class="form-group"><label>Event Code</label><input type="text" id="viewer-code" placeholder="e.g. ABC123" style="text-transform:uppercase" onkeydown="if(event.key==='Enter')viewerLogin()"/></div>
+      <button class="btn btn-secondary" style="width:100%;margin-top:8px" onclick="viewerLogin()">View Event</button>
+      <div class="error-msg" id="viewer-err"></div>
     </div>
   </div>
 </div>
-
 <script>
-async function playerLogin() {
-  const key = document.getElementById('player-key').value;
-  const errEl = document.getElementById('player-error');
-  errEl.style.display = 'none';
-  if (!key) { errEl.textContent = 'Enter access key'; errEl.style.display = 'block'; return; }
-  const fd = new FormData();
-  fd.append('access_key', key);
-  const res = await fetch('/api/auth/player-login', { method: 'POST', body: fd });
-  if (res.ok) {
-    window.location.href = '/results';
-  } else {
-    const data = await res.json();
-    errEl.textContent = data.detail || 'Invalid key';
-    errEl.style.display = 'block';
-  }
+let capCodeTimeout=null;
+async function adminLogin(){
+  const u=document.getElementById('admin-user').value, p=document.getElementById('admin-pw').value;
+  const err=document.getElementById('admin-err'); err.style.display='none';
+  const fd=new FormData(); fd.append('username',u); fd.append('password',p);
+  const res=await fetch('/api/auth/admin-login',{method:'POST',body:fd});
+  if(res.ok){window.location.href='/admin';}
+  else{const d=await res.json();err.textContent=d.detail||'Login failed';err.style.display='block';}
 }
-
-async function loadCaptains() {
-  const res = await fetch('/api/captains');
-  const captains = await res.json();
-  const sel = document.getElementById('captain-select');
-  sel.innerHTML = '<option value="">— Select your name —</option>';
-  captains.forEach(c => {
-    sel.innerHTML += `<option value="${c.id}">${c.name}</option>`;
-  });
+async function loadCaptainsForCode(code){
+  clearTimeout(capCodeTimeout);
+  if(code.length<6) return;
+  capCodeTimeout=setTimeout(async()=>{
+    const sel=document.getElementById('cap-select');
+    const res=await fetch('/api/events');
+    const events=await res.json();
+    const ev=events.find(e=>e.access_code===code.toUpperCase());
+    if(!ev){sel.innerHTML='<option value="">— Invalid code —</option>';return;}
+    const caps=await fetch(`/api/events/${ev.id}/captains`).then(r=>r.json());
+    sel.innerHTML='<option value="">— Select your name —</option>'+caps.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  },400);
 }
-
-async function adminLogin() {
-  const username = document.getElementById('admin-username').value;
-  const password = document.getElementById('admin-password').value;
-  const errEl = document.getElementById('admin-error');
-  errEl.style.display = 'none';
-
-  const fd = new FormData();
-  fd.append('username', username);
-  fd.append('password', password);
-
-  const res = await fetch('/api/auth/admin-login', { method: 'POST', body: fd });
-  if (res.ok) {
-    window.location.href = '/admin';
-  } else {
-    const data = await res.json();
-    errEl.textContent = data.detail || 'Login failed';
-    errEl.style.display = 'block';
-  }
+async function captainLogin(){
+  const code=document.getElementById('cap-code').value.toUpperCase();
+  const cid=document.getElementById('cap-select').value;
+  const pw=document.getElementById('cap-pw').value;
+  const err=document.getElementById('cap-err'); err.style.display='none';
+  if(!cid){err.textContent='Select your name';err.style.display='block';return;}
+  const fd=new FormData(); fd.append('event_code',code); fd.append('captain_id',cid); fd.append('password',pw);
+  const res=await fetch('/api/auth/captain-login',{method:'POST',body:fd});
+  if(res.ok){const d=await res.json();window.location.href=`/captain?event=${d.event_id}`;}
+  else{const d=await res.json();err.textContent=d.detail||'Login failed';err.style.display='block';}
 }
-
-async function captainLogin() {
-  const captain_id = document.getElementById('captain-select').value;
-  const password = document.getElementById('captain-password').value;
-  const errEl = document.getElementById('captain-error');
-  errEl.style.display = 'none';
-
-  if (!captain_id) { errEl.textContent = 'Select your name'; errEl.style.display = 'block'; return; }
-
-  const fd = new FormData();
-  fd.append('captain_id', captain_id);
-  fd.append('password', password);
-
-  const res = await fetch('/api/auth/captain-login', { method: 'POST', body: fd });
-  if (res.ok) {
-    window.location.href = '/captain';
-  } else {
-    const data = await res.json();
-    errEl.textContent = data.detail || 'Login failed';
-    errEl.style.display = 'block';
-  }
+async function viewerLogin(){
+  const code=document.getElementById('viewer-code').value.toUpperCase();
+  const err=document.getElementById('viewer-err'); err.style.display='none';
+  if(!code){err.textContent='Enter event code';err.style.display='block';return;}
+  const fd=new FormData(); fd.append('event_code',code);
+  const res=await fetch('/api/auth/viewer-login',{method:'POST',body:fd});
+  if(res.ok){const d=await res.json();window.location.href=`/results/${d.event_id}`;}
+  else{const d=await res.json();err.textContent=d.detail||'Invalid code';err.style.display='block';}
 }
-
-loadCaptains();
+function toast(msg,e=false){const el=document.getElementById('toast');el.textContent=msg;el.className='show'+(e?' error':'');clearTimeout(toast._t);toast._t=setTimeout(()=>el.className='',2800);}
 </script>
 </body>
 </html>

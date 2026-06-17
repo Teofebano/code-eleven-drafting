@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Admin — Code Eleven Draft</title>
+<title>Admin — Code Eleven</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/css/shared.css">
@@ -11,43 +11,24 @@
   .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
   .inline-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
   .inline-row .form-group{flex:1;min-width:120px;margin-bottom:0;}
-  /* event panel */
-  #event-panel{display:none;margin-top:0;}
-  .event-banner{background:var(--pitch-light);border:1px solid var(--border);border-radius:5px;padding:12px 18px;margin-bottom:20px;display:flex;align-items:center;gap:12px;}
-  .event-banner-name{font-family:'Bebas Neue',sans-serif;font-size:1.3rem;letter-spacing:1.5px;color:var(--lime);}
-  /* inner event tabs */
-  .inner-tab-bar{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:20px;}
-  .inner-tab{font-size:0.82rem;font-weight:700;padding:8px 16px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all 0.15s;text-transform:uppercase;letter-spacing:0.5px;}
-  .inner-tab:hover{color:var(--white);}
-  .inner-tab.active{color:var(--lime);border-bottom-color:var(--lime);}
-  .inner-panel{display:none;}.inner-panel.active{display:block;}
-  /* draft */
-  .order-list{list-style:none;display:flex;flex-direction:column;gap:8px;}
-  .order-item{display:flex;align-items:center;gap:10px;background:var(--pitch-mid);border:1.5px solid var(--border);border-radius:4px;padding:10px 14px;cursor:grab;}
-  .order-item.drag-over{border-color:var(--lime);}
-  .order-item.current-pick{border-color:var(--gold);}
-  .order-rank{font-family:'Bebas Neue',sans-serif;font-size:1.3rem;color:var(--lime);width:24px;}
-  .order-name{flex:1;font-weight:600;}
-  .answer-log{display:flex;flex-direction:column;gap:8px;}
-  .answer-entry{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--pitch-mid);border-radius:4px;border-left:3px solid var(--border);font-size:0.88rem;}
-  .answer-entry.rank-1{border-left-color:var(--gold);}
-  .answer-entry.rank-2{border-left-color:var(--silver);}
-  .answer-entry.rank-3{border-left-color:var(--bronze);}
-  .answer-entry.wrong{border-left-color:var(--danger);opacity:.5;}
-  .rank-num{font-family:'Bebas Neue',sans-serif;font-size:1.3rem;width:26px;text-align:center;}
-  .timer-display{font-family:'Bebas Neue',sans-serif;font-size:3rem;color:var(--lime);text-align:center;padding:12px;}
-  .timer-display.urgent{color:var(--danger);animation:pulse .5s infinite;}
-  .teams-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;}
-  .team-col{}
-  .team-header{font-family:'Bebas Neue',sans-serif;font-size:1.05rem;letter-spacing:1px;color:var(--lime);padding-bottom:7px;border-bottom:2px solid var(--lime);margin-bottom:10px;display:flex;justify-content:space-between;}
-  .team-player{padding:7px 0;border-bottom:1px solid rgba(45,92,62,.3);display:flex;justify-content:space-between;font-size:.84rem;}
-  /* fixtures */
-  .fixture-score{font-family:'Bebas Neue',sans-serif;font-size:1.4rem;}
-  /* modal */
+  .event-card{background:var(--card);border:1.5px solid var(--border);border-radius:6px;padding:18px 20px;transition:border-color .15s;}
+  .event-card:hover{border-color:var(--lime);}
+  .event-card-name{font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:1.5px;color:var(--lime);margin-bottom:4px;}
+  .event-card-meta{font-size:.78rem;color:var(--muted);margin-bottom:12px;}
+  .code-badge{font-family:'JetBrains Mono',monospace;font-size:.9rem;font-weight:700;background:rgba(184,255,63,.12);color:var(--lime);padding:4px 10px;border-radius:3px;letter-spacing:2px;}
+  .events-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-top:16px;}
+  /* create event form */
+  .captain-inputs{display:flex;flex-direction:column;gap:8px;margin-top:8px;}
+  .captain-input-row{display:flex;gap:8px;align-items:center;}
+  .captain-input-row input{flex:1;}
+  /* edit modal */
   .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;z-index:500;}
   .modal-overlay.open{display:flex;}
-  .modal{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:28px;max-width:480px;width:90%;}
+  .modal{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:28px;max-width:500px;width:90%;max-height:90vh;overflow-y:auto;}
   .modal h3{font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:1.5px;margin-bottom:16px;}
+  /* player db inline edit */
+  .edit-row td{background:rgba(184,255,63,.04);}
+  .edit-row input,  .edit-row select{padding:5px 8px;font-size:.82rem;}
 </style>
 </head>
 <body>
@@ -60,208 +41,72 @@
     <button class="btn btn-secondary btn-sm" onclick="logout()">Log out</button>
   </div>
 </header>
-
 <div class="main">
   <div class="tab-bar">
     <div class="tab active" data-tab="events">Events</div>
-    <div class="tab" data-tab="captains">Captains</div>
     <div class="tab" data-tab="players-db">Player DB</div>
     <div class="tab" data-tab="questions">Questions</div>
     <div class="tab" data-tab="settings">Settings</div>
   </div>
 
-  <!-- EVENTS TAB -->
+  <!-- EVENTS -->
   <div class="tab-panel active" id="tab-events">
-    <div class="grid-2" style="margin-bottom:0">
-      <div class="card">
-        <div class="card-title">Create Event</div>
-        <div class="form-group"><label>Event Name</label><input id="ev-name" placeholder="e.g. Copa de Labtek Lima 2025"/></div>
-        <div class="form-group"><label>Description</label><input id="ev-desc" placeholder="Optional"/></div>
-        <button class="btn btn-primary" onclick="createEvent()">Create & Open</button>
-      </div>
-      <div class="card">
-        <div class="card-title">Open Existing Event</div>
-        <div class="form-group"><label>Select Event</label>
-          <select id="event-selector" onchange="if(this.value){const ev=events.find(e=>e.id===this.value);if(ev)selectEvent(ev.id,ev.name);}">
-            <option value="">— Select —</option>
-          </select>
-        </div>
-      </div>
-    </div>
-    <div class="card" style="padding:0;overflow:hidden;margin-top:16px">
-      <div id="events-list"><div class="empty-state">No events yet.</div></div>
-    </div>
-
-    <!-- EVENT PANEL (shown when event is open) -->
-    <div id="event-panel">
-      <div class="event-banner" style="margin-top:20px">
-        <span class="event-banner-name" id="current-event-name"></span>
-        <span style="font-size:0.8rem;color:var(--muted)">Currently editing</span>
-      </div>
-
-      <div class="inner-tab-bar">
-        <div class="inner-tab active" data-inner="roster">Roster</div>
-        <div class="inner-tab" data-inner="draft-ctrl">Draft Control</div>
-        <div class="inner-tab" data-inner="fixtures-tab">Fixtures & Table</div>
-        <div class="inner-tab" data-inner="export-tab">Export / Restore</div>
-      </div>
-
-      <!-- ROSTER -->
-      <div class="inner-panel active" id="inner-roster">
-        <div class="grid-2">
-          <div class="card">
-            <div class="card-title">Add Player Manually</div>
-            <div class="form-group"><label>Name</label><input id="ep-name" placeholder="Player name"/></div>
-            <div class="form-group"><label>Position</label>
-              <select id="ep-pos"><option value="GK">GK</option><option value="DEF">DEF</option><option value="MID" selected>MID</option><option value="ATK">ATK</option></select>
-            </div>
-            <div class="form-group"><label>Batch Year</label><input type="number" id="ep-year" placeholder="e.g. 2012"/></div>
-            <button class="btn btn-primary" onclick="addEventPlayer()">Add</button>
-          </div>
-          <div class="card">
-            <div class="card-title">From Player Registry</div>
-            <div class="inline-row" style="margin-bottom:12px">
-              <div class="form-group" style="margin-bottom:0"><label>Search</label><input id="db-search-input" placeholder="Name or city…" oninput="searchDB()"/></div>
-            </div>
-            <div id="db-search-results" style="max-height:200px;overflow-y:auto"><div class="empty-state">Type to search…</div></div>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-title">Upload CSV to Roster</div>
-          <div class="inline-row">
-            <input type="file" id="ep-csv-file" accept=".csv" style="flex:1;padding:8px"/>
-            <button class="btn btn-secondary btn-sm" onclick="uploadEventCSV()">Upload CSV</button>
-          </div>
-          <div id="ep-csv-result" style="margin-top:8px;font-size:0.8rem"></div>
-          <div style="font-size:0.76rem;color:var(--muted);margin-top:8px">Columns: <code style="background:rgba(255,255,255,.05);padding:1px 4px;border-radius:2px">name, batch_year, position</code> — new players auto-added to DB</div>
-        </div>
-        <div class="card" style="padding:0;overflow:hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid var(--border)">
-            <span class="card-title" style="margin-bottom:0" id="event-players-count">Roster</span>
-            <button class="btn btn-danger btn-sm" onclick="clearEventPlayers()">Clear All</button>
-          </div>
-          <div class="table-wrap" id="event-players-table"><div class="empty-state">No players.</div></div>
-        </div>
-      </div>
-
-      <!-- DRAFT CONTROL -->
-      <div class="inner-panel" id="inner-draft-ctrl">
-        <div class="status-bar">
-          <span><span class="status-dot"></span> Live</span>
-          <span>Phase: <strong id="st-phase">lobby</strong></span>
-          <span>Group: <strong id="st-group">—</strong></span>
-          <span>Picks: <strong id="st-picks">0</strong></span>
-        </div>
-        <div class="grid-2">
-          <div class="card">
-            <div class="card-title">Round Control</div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
-              <button class="btn btn-primary" onclick="startRound()">▶ Start Next Round</button>
-              <button class="btn btn-secondary" onclick="endDraft()">End Draft</button>
-              <button class="btn btn-danger btn-sm" onclick="resetDraft()">Reset</button>
-            </div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap">
-              <a id="export-hist-link" href="#" class="btn btn-secondary btn-sm" onclick="exportLink('history')">⬇ History CSV</a>
-              <a id="export-teams-link" href="#" class="btn btn-secondary btn-sm" onclick="exportLink('teams')">⬇ Teams CSV</a>
-            </div>
-          </div>
-          <div class="card" id="mcq-panel" style="display:none">
-            <div class="card-title">Active MCQ</div>
-            <div class="timer-display" id="admin-timer">—</div>
-            <div id="admin-question" style="font-size:.93rem;font-weight:600;margin-bottom:8px"></div>
-            <div id="admin-options" style="font-size:.82rem;color:var(--muted)"></div>
-          </div>
-        </div>
-        <div class="card" id="order-override-card" style="display:none">
-          <div class="card-title">Draft Order Override</div>
-          <p style="font-size:.82rem;color:var(--muted);margin-bottom:12px">Drag to reorder. Correct answers first, then wrong, then no-answer.</p>
-          <ul class="order-list" id="order-list"></ul>
-          <button class="btn btn-primary" style="margin-top:12px" onclick="applyDraftOrder()">Apply & Start Draft</button>
-        </div>
-        <div class="card"><div class="card-title">MCQ Answer Log</div><div id="answer-log"><div class="empty-state">No answers yet.</div></div></div>
-        <div class="card"><div class="card-title">Live Teams</div><div id="live-teams"><div class="empty-state">No picks yet.</div></div></div>
-        <div class="card"><div class="card-title">Pick History</div><div class="table-wrap" id="pick-history"><div class="empty-state">No picks.</div></div></div>
-      </div>
-
-      <!-- FIXTURES & TABLE -->
-      <div class="inner-panel" id="inner-fixtures-tab">
-        <div class="grid-2">
-          <div class="card">
-            <div class="card-title">Add Fixture</div>
-            <div class="form-group"><label>Home Team</label><select id="fixture-home"></select></div>
-            <div class="form-group"><label>Away Team</label><select id="fixture-away"></select></div>
-            <div class="form-group"><label>Match Date</label><input type="date" id="fixture-date"/></div>
-            <button class="btn btn-primary" onclick="addFixture()">Add Fixture</button>
-          </div>
-          <div class="card">
-            <div class="card-title">Group Table</div>
-            <div id="standings-table"><div class="empty-state">No matches played.</div></div>
-          </div>
-        </div>
-        <div class="card"><div class="card-title">Fixtures</div><div id="fixtures-list"><div class="empty-state">No fixtures yet.</div></div></div>
-        <div class="card"><div class="card-title">Player Stats</div><div id="player-stats-table"><div class="empty-state">No stats yet.</div></div></div>
-      </div>
-
-      <!-- EXPORT / RESTORE -->
-      <div class="inner-panel" id="inner-export-tab">
-        <div class="card">
-          <div class="card-title">Restore from Export</div>
-          <p style="font-size:.84rem;color:var(--muted);margin-bottom:16px">Use CSVs from a previous export to restore player assignments.</p>
-          <div class="inline-row">
-            <input type="file" id="restore-teams-file" accept=".csv" style="flex:1;padding:8px"/>
-            <button class="btn btn-primary btn-sm" onclick="restoreTeams()">Upload teams.csv</button>
-          </div>
-          <div id="restore-result" style="margin-top:10px;font-size:.8rem"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- CAPTAINS TAB -->
-  <div class="tab-panel" id="tab-captains">
     <div class="card">
-      <div class="card-title">Add Captain</div>
-      <div class="inline-row">
-        <div class="form-group"><label>Name</label><input id="cap-name" placeholder="Captain name"/></div>
-        <div class="form-group"><label>Password</label><input type="password" id="cap-pw" placeholder="Set password"/></div>
-        <button class="btn btn-primary btn-sm" onclick="addCaptain()">Add</button>
+      <div class="card-title">Create New Event</div>
+      <div class="grid-2">
+        <div>
+          <div class="form-group"><label>Event Name</label><input id="ev-name" placeholder="e.g. Copa de Labtek Lima 2025"/></div>
+          <div class="form-group"><label>Description</label><input id="ev-desc" placeholder="Optional"/></div>
+          <div class="form-group"><label>Captain Password <span style="color:var(--muted);font-weight:normal">(shared for all captains)</span></label><input type="password" id="ev-cap-pw" placeholder="e.g. codeeleven"/></div>
+        </div>
+        <div>
+          <div class="form-group">
+            <label>Number of Teams</label>
+            <input type="number" id="ev-num-teams" placeholder="e.g. 4" min="2" max="16" oninput="renderCaptainInputs()"/>
+          </div>
+          <div class="form-group">
+            <label>Captain Names</label>
+            <div class="captain-inputs" id="captain-inputs"><div style="font-size:.8rem;color:var(--muted)">Enter number of teams first</div></div>
+          </div>
+        </div>
       </div>
+      <button class="btn btn-primary" style="margin-top:8px" onclick="createEvent()">Create Event</button>
     </div>
-    <div class="card" style="padding:0;overflow:hidden"><div class="table-wrap" id="captains-table"><div class="empty-state">No captains.</div></div></div>
+    <div id="events-grid" class="events-grid"><div class="empty-state">No events yet.</div></div>
   </div>
 
-  <!-- PLAYERS DB TAB -->
+  <!-- PLAYER DB -->
   <div class="tab-panel" id="tab-players-db">
     <div class="grid-2">
       <div class="card">
-        <div class="card-title">Add to Registry</div>
+        <div class="card-title">Add Player</div>
         <div class="form-group"><label>Name</label><input id="db-name" placeholder="Player name"/></div>
         <div class="form-group"><label>Position</label>
           <select id="db-pos"><option value="GK">GK</option><option value="DEF">DEF</option><option value="MID" selected>MID</option><option value="ATK">ATK</option></select>
         </div>
-        <div class="form-group"><label>Batch Year</label><input type="number" id="db-year" placeholder="e.g. 2010"/></div>
+        <div class="form-group"><label>Batch Year</label><input type="number" id="db-year" placeholder="e.g. 2010" min="1985" max="2030"/></div>
         <div class="form-group"><label>City</label><input id="db-city" placeholder="Optional"/></div>
         <button class="btn btn-primary" onclick="addPlayerDB()">Add to Registry</button>
       </div>
       <div class="card">
-        <div class="card-title">Import CSV to Registry</div>
-        <p style="font-size:.84rem;color:var(--muted);margin-bottom:12px">New players added, existing updated (position upserted, city preserved if not in CSV).</p>
+        <div class="card-title">Import CSV</div>
+        <p style="font-size:.83rem;color:var(--muted);margin-bottom:12px">New players added, existing updated (position upserted, city preserved if not in CSV).</p>
         <div class="form-group"><label>CSV File</label><input type="file" id="db-csv-file" accept=".csv" style="padding:8px"/></div>
-        <button class="btn btn-secondary" onclick="uploadDBCSV()">Import CSV</button>
+        <button class="btn btn-secondary" onclick="uploadDBCSV()">Import</button>
         <div id="db-csv-result" style="margin-top:10px;font-size:.8rem"></div>
-        <div style="font-size:.75rem;color:var(--muted);margin-top:10px">Columns: <code style="background:rgba(255,255,255,.05);padding:1px 4px;border-radius:2px">name, batch_year, position</code> + optional <code style="background:rgba(255,255,255,.05);padding:1px 4px;border-radius:2px">city</code></div>
+        <div style="font-size:.74rem;color:var(--muted);margin-top:8px">Columns: <code style="background:rgba(255,255,255,.05);padding:1px 4px;border-radius:2px">name, batch_year, position</code> + optional <code style="background:rgba(255,255,255,.05);padding:1px 4px;border-radius:2px">city</code></div>
       </div>
     </div>
     <div class="card" style="padding:0;overflow:hidden">
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid var(--border)">
-        <span class="card-title" style="margin-bottom:0" id="players-db-count">Player Registry</span>
-        <input placeholder="Search…" style="width:200px;padding:6px 10px;font-size:.82rem" oninput="loadPlayersDB(this.value)"/>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid var(--border);gap:12px">
+        <span class="card-title" style="margin-bottom:0" id="db-count">Player Registry</span>
+        <input placeholder="Search name or city…" style="width:220px;padding:6px 10px;font-size:.82rem" oninput="loadPlayersDB(this.value)"/>
       </div>
-      <div class="table-wrap" id="players-db-table"><div class="empty-state">No players in registry.</div></div>
+      <div class="table-wrap" id="players-db-table"><div class="empty-state">No players.</div></div>
     </div>
   </div>
 
-  <!-- QUESTIONS TAB -->
+  <!-- QUESTIONS -->
   <div class="tab-panel" id="tab-questions">
     <div class="card">
       <div class="card-title">Add Question</div>
@@ -280,7 +125,7 @@
     <div id="questions-list"><div class="empty-state">No questions yet.</div></div>
   </div>
 
-  <!-- SETTINGS TAB -->
+  <!-- SETTINGS -->
   <div class="tab-panel" id="tab-settings">
     <div class="card" style="max-width:500px">
       <div class="card-title">Add Admin Account</div>
@@ -292,45 +137,28 @@
   </div>
 </div>
 
-<!-- FIXTURE EVENT MODAL -->
-<div class="modal-overlay" id="fixture-event-modal">
+<!-- EDIT EVENT MODAL -->
+<div class="modal-overlay" id="edit-event-modal">
   <div class="modal">
-    <h3>Log Match Event</h3>
-    <div class="form-group"><label>Team</label><select id="fe-captain" onchange="renderEventModalPlayerList()"></select></div>
-    <div class="form-group"><label>Player</label><select id="fe-player"></select></div>
-    <div class="grid-2">
-      <div class="form-group"><label>Event Type</label>
-        <select id="fe-type"><option value="goal">⚽ Goal</option><option value="assist">🎯 Assist</option><option value="cleansheet">🧤 Cleansheet</option></select>
-      </div>
-      <div class="form-group"><label>Minute</label><input type="number" id="fe-minute" placeholder="e.g. 45" min="1" max="120"/></div>
+    <h3>Edit Event</h3>
+    <input type="hidden" id="edit-ev-id"/>
+    <div class="form-group"><label>Event Name</label><input id="edit-ev-name" placeholder="Event name"/></div>
+    <div class="form-group"><label>Description</label><input id="edit-ev-desc" placeholder="Optional"/></div>
+    <div class="form-group"><label>Captain Password <span style="color:var(--muted);font-weight:normal">(leave blank to keep current)</span></label><input type="password" id="edit-ev-cap-pw" placeholder="Leave blank to keep"/></div>
+    <div class="divider"></div>
+    <div class="card-title" style="margin-bottom:10px">Captains</div>
+    <div id="edit-captains-list"></div>
+    <div class="inline-row" style="margin-top:10px">
+      <input id="new-cap-name" placeholder="Add captain name" style="flex:1"/>
+      <button class="btn btn-secondary btn-sm" onclick="addCaptainToEvent()">Add</button>
     </div>
-    <div style="display:flex;gap:10px;margin-top:8px">
-      <button class="btn btn-primary" onclick="addFixtureEvent()">Log</button>
-      <button class="btn btn-secondary" onclick="closeEventModal()">Close</button>
+    <div style="display:flex;gap:10px;margin-top:18px">
+      <button class="btn btn-primary" onclick="saveEventEdit()">Save</button>
+      <button class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
     </div>
   </div>
 </div>
 
-<script>
-// inner tab setup
-document.querySelectorAll('.inner-tab').forEach(t=>{
-  t.addEventListener('click',()=>{
-    const parent=t.closest('#event-panel');
-    parent.querySelectorAll('.inner-tab').forEach(x=>x.classList.remove('active'));
-    parent.querySelectorAll('.inner-panel').forEach(x=>x.classList.remove('active'));
-    t.classList.add('active');
-    document.getElementById('inner-'+t.dataset.inner).classList.add('active');
-    if(t.dataset.inner==='draft-ctrl') loadGame();
-    if(t.dataset.inner==='fixtures-tab'){renderCaptainSelects();loadFixtures();}
-    if(t.dataset.inner==='export-tab') {}
-  });
-});
-function exportLink(type) {
-  if(!currentEventId){toast('Open an event first',true);return false;}
-  window.location.href=`/api/events/${currentEventId}/export/${type}`;
-  return false;
-}
-</script>
 <script src="/static/js/admin.js"></script>
 </body>
 </html>

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Event — Code Eleven</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/shared.css">
+<style>
+  .main{max-width:1100px;margin:0 auto;padding:24px 20px;}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .inline-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
+  .inline-row .form-group{flex:1;min-width:120px;margin-bottom:0;}
+  .order-list{list-style:none;display:flex;flex-direction:column;gap:8px;}
+  .order-item{display:flex;align-items:center;gap:10px;background:var(--pitch-mid);border:1.5px solid var(--border);border-radius:4px;padding:10px 14px;cursor:grab;}
+  .order-item.drag-over{border-color:var(--lime);}
+  .order-item.current-pick{border-color:var(--gold);}
+  .order-rank{font-family:'Bebas Neue',sans-serif;font-size:1.3rem;color:var(--lime);width:24px;}
+  .order-name{flex:1;font-weight:600;}
+  .answer-log{display:flex;flex-direction:column;gap:8px;}
+  .answer-entry{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--pitch-mid);border-radius:4px;border-left:3px solid var(--border);font-size:.88rem;}
+  .answer-entry.rank-1{border-left-color:var(--gold);}
+  .answer-entry.rank-2{border-left-color:var(--silver);}
+  .answer-entry.rank-3{border-left-color:var(--bronze);}
+  .answer-entry.wrong{border-left-color:var(--danger);opacity:.5;}
+  .rank-num{font-family:'Bebas Neue',sans-serif;font-size:1.3rem;width:26px;text-align:center;}
+  .timer-display{font-family:'Bebas Neue',sans-serif;font-size:3rem;color:var(--lime);text-align:center;padding:12px;}
+  .timer-display.urgent{color:var(--danger);animation:pulse .5s infinite;}
+  .teams-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;}
+  .team-col .team-header{font-family:'Bebas Neue',sans-serif;font-size:1.05rem;letter-spacing:1px;color:var(--lime);padding-bottom:7px;border-bottom:2px solid var(--lime);margin-bottom:10px;display:flex;justify-content:space-between;}
+  .team-player{padding:7px 0;border-bottom:1px solid rgba(45,92,62,.3);display:flex;justify-content:space-between;font-size:.84rem;}
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;z-index:500;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:28px;max-width:480px;width:90%;}
+  .modal h3{font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:1.5px;margin-bottom:16px;}
+  .event-meta{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:24px;padding:14px 18px;background:var(--card);border:1px solid var(--border);border-radius:5px;}
+  .event-meta-name{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;letter-spacing:2px;color:var(--lime);}
+  .code-chip{font-family:'JetBrains Mono',monospace;font-size:1rem;font-weight:700;background:rgba(184,255,63,.12);color:var(--lime);padding:5px 12px;border-radius:3px;letter-spacing:3px;}
+</style>
+</head>
+<body>
+<div id="toast"></div>
+<header>
+  <div class="logo">CODE <span>ELEVEN</span></div>
+  <div class="header-right">
+    <span class="header-user" id="admin-name-h"></span>
+    <div class="header-badge">Event Admin</div>
+    <a href="/admin" class="btn btn-secondary btn-sm">← All Events</a>
+    <button class="btn btn-secondary btn-sm" onclick="logout()">Log out</button>
+  </div>
+</header>
+<div class="main">
+  <div class="event-meta" id="event-meta">
+    <div>
+      <div class="event-meta-name" id="ev-title">Loading…</div>
+      <div style="font-size:.78rem;color:var(--muted)" id="ev-desc-line"></div>
+    </div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Event Code</span>
+      <span class="code-chip" id="ev-code">——</span>
+      <button class="btn btn-secondary btn-sm" onclick="regenCode()">Regen</button>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab active" data-tab="roster">Roster</div>
+    <div class="tab" data-tab="draft-ctrl">Draft Control</div>
+    <div class="tab" data-tab="fixtures-tab">Fixtures &amp; Table</div>
+    <div class="tab" data-tab="export-tab">Export / Restore</div>
+  </div>
+
+  <!-- ROSTER -->
+  <div class="tab-panel active" id="tab-roster">
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">Add Player Manually</div>
+        <div class="form-group"><label>Name</label><input id="ep-name" placeholder="Player name"/></div>
+        <div class="form-group"><label>Position</label>
+          <select id="ep-pos"><option value="GK">GK</option><option value="DEF">DEF</option><option value="MID" selected>MID</option><option value="ATK">ATK</option></select>
+        </div>
+        <div class="form-group"><label>Batch Year</label><input type="number" id="ep-year" placeholder="e.g. 2012"/></div>
+        <button class="btn btn-primary" onclick="addEventPlayer()">Add</button>
+      </div>
+      <div class="card">
+        <div class="card-title">From Player Registry</div>
+        <input id="db-search-input" placeholder="Search name or city…" style="width:100%;margin-bottom:10px" oninput="searchDB()"/>
+        <div id="db-search-results" style="max-height:220px;overflow-y:auto"><div class="empty-state" style="padding:16px">Type to search…</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Upload CSV to Roster</div>
+      <div class="inline-row">
+        <input type="file" id="ep-csv-file" accept=".csv" style="flex:1;padding:8px"/>
+        <button class="btn btn-secondary btn-sm" onclick="uploadEventCSV()">Upload</button>
+      </div>
+      <div id="ep-csv-result" style="margin-top:8px;font-size:.8rem"></div>
+      <div style="font-size:.74rem;color:var(--muted);margin-top:6px">Columns: <code style="background:rgba(255,255,255,.05);padding:1px 4px;border-radius:2px">name, batch_year, position</code> — captains auto-excluded, new players added to DB</div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid var(--border)">
+        <span class="card-title" style="margin-bottom:0" id="ep-count">Roster</span>
+        <button class="btn btn-danger btn-sm" onclick="clearEventPlayers()">Clear All</button>
+      </div>
+      <div class="table-wrap" id="ep-table"><div class="empty-state">No players.</div></div>
+    </div>
+  </div>
+
+  <!-- DRAFT CONTROL -->
+  <div class="tab-panel" id="tab-draft-ctrl">
+    <div class="status-bar">
+      <span><span class="status-dot"></span> Live</span>
+      <span>Phase: <strong id="st-phase">lobby</strong></span>
+      <span>Group: <strong id="st-group">—</strong></span>
+      <span>Picks: <strong id="st-picks">0</strong></span>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">Round Control</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+          <button class="btn btn-primary" onclick="startRound()">▶ Start Next Round</button>
+          <button class="btn btn-secondary" onclick="endDraft()">End Draft</button>
+          <button class="btn btn-danger btn-sm" onclick="resetDraft()">Reset</button>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" onclick="exportFile('history')">⬇ History CSV</button>
+          <button class="btn btn-secondary btn-sm" onclick="exportFile('teams')">⬇ Teams CSV</button>
+        </div>
+      </div>
+      <div class="card" id="mcq-panel" style="display:none">
+        <div class="card-title">Active MCQ</div>
+        <div class="timer-display" id="admin-timer">—</div>
+        <div id="admin-question" style="font-size:.93rem;font-weight:600;margin-bottom:8px"></div>
+        <div id="admin-options" style="font-size:.82rem;color:var(--muted)"></div>
+      </div>
+    </div>
+    <div class="card" id="order-override-card" style="display:none">
+      <div class="card-title">Draft Order Override</div>
+      <p style="font-size:.82rem;color:var(--muted);margin-bottom:12px">Drag to reorder. Correct → Wrong → No answer.</p>
+      <ul class="order-list" id="order-list"></ul>
+      <button class="btn btn-primary" style="margin-top:12px" onclick="applyDraftOrder()">Apply &amp; Start Draft</button>
+    </div>
+    <div class="card"><div class="card-title">MCQ Answer Log</div><div id="answer-log"><div class="empty-state">No answers yet.</div></div></div>
+    <div class="card"><div class="card-title">Live Teams</div><div id="live-teams"><div class="empty-state">No picks.</div></div></div>
+    <div class="card"><div class="card-title">Pick History</div><div class="table-wrap" id="pick-history"><div class="empty-state">No picks.</div></div></div>
+  </div>
+
+  <!-- FIXTURES -->
+  <div class="tab-panel" id="tab-fixtures-tab">
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">Add Fixture</div>
+        <div class="form-group"><label>Home Team</label><select id="fixture-home"></select></div>
+        <div class="form-group"><label>Away Team</label><select id="fixture-away"></select></div>
+        <div class="form-group"><label>Match Date</label><input type="date" id="fixture-date"/></div>
+        <button class="btn btn-primary" onclick="addFixture()">Add Fixture</button>
+      </div>
+      <div class="card">
+        <div class="card-title">Group Table</div>
+        <div id="standings-table"><div class="empty-state">No matches played.</div></div>
+      </div>
+    </div>
+    <div class="card"><div class="card-title">Fixtures</div><div id="fixtures-list"><div class="empty-state">No fixtures.</div></div></div>
+    <div class="card"><div class="card-title">Player Stats</div><div id="player-stats-table"><div class="empty-state">No stats.</div></div></div>
+  </div>
+
+  <!-- EXPORT/RESTORE -->
+  <div class="tab-panel" id="tab-export-tab">
+    <div class="card" style="max-width:600px">
+      <div class="card-title">Restore from Export</div>
+      <p style="font-size:.84rem;color:var(--muted);margin-bottom:16px">Upload a previously exported <code style="background:rgba(255,255,255,.05);padding:1px 5px;border-radius:2px">teams.csv</code> to restore player assignments.</p>
+      <div class="inline-row">
+        <input type="file" id="restore-teams-file" accept=".csv" style="flex:1;padding:8px"/>
+        <button class="btn btn-primary btn-sm" onclick="restoreTeams()">Upload teams.csv</button>
+      </div>
+      <div id="restore-result" style="margin-top:10px;font-size:.8rem"></div>
+    </div>
+  </div>
+</div>
+
+<!-- FIXTURE EVENT MODAL -->
+<div class="modal-overlay" id="fixture-event-modal">
+  <div class="modal">
+    <h3>Log Match Event</h3>
+    <div class="form-group"><label>Team</label><select id="fe-captain" onchange="renderFEPlayers()"></select></div>
+    <div class="form-group"><label>Player</label><select id="fe-player"></select></div>
+    <div class="grid-2">
+      <div class="form-group"><label>Event Type</label>
+        <select id="fe-type"><option value="goal">⚽ Goal</option><option value="assist">🎯 Assist</option><option value="cleansheet">🧤 Cleansheet</option></select>
+      </div>
+      <div class="form-group"><label>Minute</label><input type="number" id="fe-minute" placeholder="e.g. 45" min="1" max="120"/></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn btn-primary" onclick="addFixtureEvent()">Log</button>
+      <button class="btn btn-secondary" onclick="closeEventModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/event.js"></script>
+</body>
+</html>
