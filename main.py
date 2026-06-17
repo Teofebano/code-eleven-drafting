@@ -125,6 +125,14 @@ def init_db():
         minute INTEGER DEFAULT NULL
     );
     """)
+    # ensure all events have access_code (fix for migrated legacy events)
+    rows = c.execute("SELECT id, access_code FROM events").fetchall()
+    for row in rows:
+        if not row["access_code"] or row["access_code"] == "None":
+            import random, string
+            code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            c.execute("UPDATE events SET access_code=? WHERE id=?", (code, row["id"]))
+
     # seed admin
     if not c.execute("SELECT id FROM admins LIMIT 1").fetchone():
         c.execute("INSERT INTO admins(id,username,password_hash) VALUES(?,?,?)",

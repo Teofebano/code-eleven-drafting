@@ -41,7 +41,6 @@ function renderEvents(){
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <a href="/event/${ev.id}" class="btn btn-primary btn-sm">Open Event</a>
-        <button class="btn btn-secondary btn-sm" onclick="openEditModal('${ev.id}')">Edit</button>
         <button class="btn btn-danger btn-sm" onclick="deleteEvent('${ev.id}')">Delete</button>
       </div>
     </div>`).join('');

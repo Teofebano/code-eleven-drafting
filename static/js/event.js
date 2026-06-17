@@ -32,9 +32,10 @@ function setupTabs(){
 
 async function loadEventData(){
   eventData=await fetch(`/api/events/${eid}`).then(r=>r.json());
-  document.getElementById('ev-title').textContent=eventData.name;
+  if(eventData.detail){document.getElementById('ev-title').textContent='Error loading event';return;}
+  document.getElementById('ev-title').textContent=eventData.name||'Event';
   document.getElementById('ev-desc-line').textContent=eventData.description||'';
-  document.getElementById('ev-code').textContent=eventData.access_code;
+  document.getElementById('ev-code').textContent=eventData.access_code||'(none — regen to assign)';
   captains=eventData.captains||[];
 }
 
@@ -396,12 +397,29 @@ function renderStandings(){
 async function restoreTeams(){
   const file=document.getElementById('restore-teams-file').files[0];
   if(!file){toast('Select file',true);return;}
+
+  // Read CSV to detect event info for confirmation
+  const text=await file.text();
+  const lines=text.trim().split('\n').filter(l=>l.trim());
+  const total=Math.max(0,lines.length-1); // minus header
+
+  const confirmed=confirm(
+    `Ready to restore from CSV.\n\n` +
+    `Detected rows: ${total}\n` +
+    `Target event: ${eventData?.name||eid}\n\n` +
+    `This will add missing players and reassign them to captains by name match.\nProceed?`
+  );
+  if(!confirmed) return;
+
   const fd=new FormData();fd.append('file',file);
   const res=await fetch(`/api/events/${eid}/restore/teams`,{method:'POST',body:fd});
   const data=await res.json();
   const el=document.getElementById('restore-result');
-  if(res.ok){el.innerHTML=`<span class="text-lime">✓ ${data.added} added, ${data.assigned} assigned.</span>`+(data.skipped.length?`<br><span class="text-danger">${data.skipped.join(' · ')}</span>`:'');toast('Restore complete');loadPlayers();}
-  else{el.innerHTML=`<span class="text-danger">${data.detail}</span>`;}
+  if(res.ok){
+    el.innerHTML=`<span class="text-lime">✓ ${data.added} players added, ${data.assigned} assigned.</span>`
+      +(data.skipped&&data.skipped.length?`<br><span class="text-danger">Skipped: ${data.skipped.join(' · ')}</span>`:'');
+    toast('Restore complete');loadPlayers();
+  } else {el.innerHTML=`<span class="text-danger">${data.detail}</span>`;}
 }
 
 async function logout(){await fetch('/api/auth/logout',{method:'POST'});window.location.href='/';}
