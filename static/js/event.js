@@ -329,11 +329,10 @@ async function addFixtureEvent(){
   const cid=document.getElementById('fe-captain').value;
   const pval=document.getElementById('fe-player').value;
   const etype=document.getElementById('fe-type').value;
-  const min=document.getElementById('fe-minute').value;
   if(!pval){toast('Select player',true);return;}
   const[pid,pname]=pval.split('|');
-  await fetch(`/api/events/${eid}/fixtures/${activeFixtureId}/events`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({player_id:pid,player_name:pname,captain_id:cid,event_type:etype,minute:min?parseInt(min):null})});
-  toast(`${etype} logged`);document.getElementById('fe-minute').value='';
+  await fetch(`/api/events/${eid}/fixtures/${activeFixtureId}/events`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({player_id:pid,player_name:pname,captain_id:cid,event_type:etype,minute:null})});
+  toast(`${etype} logged`);
 }
 
 async function deleteFixtureEvent(fid,evid){

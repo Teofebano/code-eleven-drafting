@@ -125,13 +125,44 @@ def init_db():
         minute INTEGER DEFAULT NULL
     );
     """)
-    # ensure all events have access_code (fix for migrated legacy events)
-    rows = c.execute("SELECT id, access_code FROM events").fetchall()
-    for row in rows:
-        if not row["access_code"] or row["access_code"] == "None":
-            import random, string
-            code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-            c.execute("UPDATE events SET access_code=? WHERE id=?", (code, row["id"]))
+    # ── SCHEMA MIGRATIONS (safe to run repeatedly) ──────────────────────────
+    # Fix events table: add missing columns from old schema
+    try:
+        ev_cols = [r[1] for r in c.execute("PRAGMA table_info(events)").fetchall()]
+        if ev_cols:  # table exists
+            if "access_code" not in ev_cols:
+                c.execute("ALTER TABLE events ADD COLUMN access_code TEXT")
+            if "captain_password" not in ev_cols:
+                c.execute("ALTER TABLE events ADD COLUMN captain_password TEXT DEFAULT 'captain123'")
+            if "num_teams" not in ev_cols:
+                c.execute("ALTER TABLE events ADD COLUMN num_teams INTEGER DEFAULT 0")
+    except Exception as e:
+        print(f"Events schema fix note: {e}")
+
+    # Fix captains table: recreate with event_id if missing
+    try:
+        cap_cols = [r[1] for r in c.execute("PRAGMA table_info(captains)").fetchall()]
+        if cap_cols and "event_id" not in cap_cols:
+            c.execute("ALTER TABLE captains RENAME TO captains_old")
+            c.execute("""CREATE TABLE captains (
+                id TEXT PRIMARY KEY,
+                event_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                team_number INTEGER NOT NULL DEFAULT 1
+            )""")
+            c.execute("DROP TABLE captains_old")
+    except Exception as e:
+        print(f"Captains schema fix note: {e}")
+
+    # Backfill access_code for any events that don't have one
+    try:
+        rows = c.execute("SELECT id, access_code FROM events").fetchall()
+        for row in rows:
+            if not row["access_code"] or str(row["access_code"]) == "None":
+                code = gen_code()
+                c.execute("UPDATE events SET access_code=? WHERE id=?", (code, row["id"]))
+    except Exception as e:
+        print(f"Access code backfill note: {e}")
 
     # seed admin
     if not c.execute("SELECT id FROM admins LIMIT 1").fetchone():
@@ -143,11 +174,11 @@ def init_db():
 
 def _migrate(c):
     try:
+        # check players table exists
+        tables = [r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+        if "players" not in tables: return
         old = c.execute("SELECT * FROM players LIMIT 1").fetchone()
         if not old: return
-        # check if events table has access_code column (new schema)
-        ev = c.execute("SELECT * FROM events LIMIT 1").fetchone()
-        if ev and "access_code" not in ev.keys(): return  # old schema events exist, skip
         if c.execute("SELECT id FROM events WHERE name='Copa de Labtek Lima 1st Edition'").fetchone(): return
         eid = str(uuid.uuid4())
         code = gen_code()
@@ -406,9 +437,15 @@ async def create_event(
     conn.execute("INSERT INTO events(id,name,description,access_code,captain_password,num_teams,status) VALUES(?,?,?,?,?,?,?)",
                  (eid, name.strip(), description.strip(), code, captain_password, num_teams, "setup"))
     for i, cname in enumerate(names, 1):
-        if cname.strip():
-            conn.execute("INSERT INTO captains(id,event_id,name,team_number) VALUES(?,?,?,?)",
-                         (str(uuid.uuid4()), eid, cname.strip(), i))
+        if not cname.strip(): continue
+        cid = str(uuid.uuid4())
+        conn.execute("INSERT INTO captains(id,event_id,name,team_number) VALUES(?,?,?,?)",
+                     (cid, eid, cname.strip(), i))
+        # auto-add captain as a player assigned to themselves
+        db_r = conn.execute("SELECT id,position,batch_year FROM players_db WHERE name=?", (cname.strip(),)).fetchone()
+        conn.execute("INSERT INTO event_players(id,event_id,player_db_id,name,position,batch_year,taken_by) VALUES(?,?,?,?,?,?,?)",
+                     (str(uuid.uuid4()), eid, db_r["id"] if db_r else None, cname.strip(),
+                      db_r["position"] if db_r else "MID", db_r["batch_year"] if db_r else 0, cid))
     conn.commit(); conn.close()
     await mgr.broadcast("global", {"type":"events_updated"})
     return {"ok":True,"id":eid,"access_code":code}
@@ -895,6 +932,44 @@ async def get_results(eid: str, token: str = Cookie(default=None)):
     phase=gs_get(conn,eid,"phase","lobby")
     conn.close()
     return {"phase":phase,"event":dict(ev),"captains":[dict(c) for c in caps],"players":[dict(p) for p in players]}
+
+
+@app.get("/api/events/{eid}/standings-full")
+async def get_standings_full(eid: str, token: str = Cookie(default=None)):
+    """Standings + fixtures for the results page (viewer-accessible)."""
+    if not token: raise HTTPException(401,"Not authenticated")
+    d=decode_token(token)
+    if not d or d.get("role") not in ("viewer","captain","admin"): raise HTTPException(403,"Login required")
+    conn=get_db()
+    caps={c["id"]:c["name"] for c in conn.execute("SELECT id,name FROM captains WHERE event_id=?",(eid,)).fetchall()}
+    fixtures_raw=conn.execute("""SELECT f.*,ch.name as home_name,ca.name as away_name
+        FROM fixtures f JOIN captains ch ON f.home_captain_id=ch.id JOIN captains ca ON f.away_captain_id=ca.id
+        WHERE f.event_id=? ORDER BY f.match_date,f.created_at""",(eid,)).fetchall()
+    fixtures=[dict(r) for r in fixtures_raw]
+    played=conn.execute("SELECT * FROM fixtures WHERE event_id=? AND status='played'",(eid,)).fetchall()
+    stats={cid:{"name":name,"p":0,"w":0,"d":0,"l":0,"gf":0,"ga":0,"pts":0} for cid,name in caps.items()}
+    for f in played:
+        h,a=f["home_captain_id"],f["away_captain_id"]; hs,as_=f["home_score"] or 0,f["away_score"] or 0
+        for x in [h,a]:
+            if x not in stats: stats[x]={"name":caps.get(x,x),"p":0,"w":0,"d":0,"l":0,"gf":0,"ga":0,"pts":0}
+        stats[h]["p"]+=1;stats[h]["gf"]+=hs;stats[h]["ga"]+=as_
+        stats[a]["p"]+=1;stats[a]["gf"]+=as_;stats[a]["ga"]+=hs
+        if hs>as_: stats[h]["w"]+=1;stats[h]["pts"]+=3;stats[a]["l"]+=1
+        elif hs<as_: stats[a]["w"]+=1;stats[a]["pts"]+=3;stats[h]["l"]+=1
+        else: stats[h]["d"]+=1;stats[h]["pts"]+=1;stats[a]["d"]+=1;stats[a]["pts"]+=1
+    for s in stats.values(): s["gd"]=s["gf"]-s["ga"]
+    table=sorted(stats.values(),key=lambda s:(-s["pts"],-s["gd"],-s["gf"],s["name"]))
+    evts=conn.execute("SELECT * FROM fixture_events WHERE event_id=?",(eid,)).fetchall()
+    pstats={}
+    for e in evts:
+        pid=e["player_id"];pn=e["player_name"]
+        if pid not in pstats: pstats[pid]={"name":pn,"goals":0,"assists":0,"cleansheets":0}
+        if e["event_type"]=="goal": pstats[pid]["goals"]+=1
+        elif e["event_type"]=="assist": pstats[pid]["assists"]+=1
+        elif e["event_type"]=="cleansheet": pstats[pid]["cleansheets"]+=1
+    conn.close()
+    return {"table":table,"fixtures":fixtures,
+            "player_stats":sorted(pstats.values(),key=lambda p:(-p["goals"],-p["assists"],-p["cleansheets"],p["name"]))}
 
 # ── EXPORT / RESTORE ──────────────────────────────────────────────────────
 @app.get("/api/events/{eid}/export/history")

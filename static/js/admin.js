@@ -6,7 +6,7 @@ async function init(){
   if(!me.role||me.role!=='admin'){window.location.href='/';return;}
   document.getElementById('admin-name').textContent=me.name;
   setupTabs();
-  loadEvents(); loadQuestions();
+  loadEvents(); loadQuestions(); loadPlayersDB();
 }
 
 function setupTabs(){
@@ -50,36 +50,48 @@ function renderCaptainInputs(){
   const n=parseInt(document.getElementById('ev-num-teams').value)||0;
   const el=document.getElementById('captain-inputs');
   if(!n||n<1){el.innerHTML='<div style="font-size:.8rem;color:var(--muted)">Enter number of teams first</div>';return;}
-  el.innerHTML=Array.from({length:n},(_,i)=>`
+  // build datalist from player DB
+  const datalistId='cap-name-suggestions';
+  let datalistHtml=`<datalist id="${datalistId}">${dbPlayers.map(p=>`<option value="${p.name}">`).join('')}</datalist>`;
+  el.innerHTML=datalistHtml+Array.from({length:n},(_,i)=>`
     <div class="captain-input-row">
       <span style="font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--muted);width:20px">${i+1}</span>
-      <input class="cap-name-input" placeholder="Captain ${i+1} name"/>
+      <input class="cap-name-input" placeholder="Captain ${i+1} name" list="${datalistId}" autocomplete="off"/>
     </div>`).join('');
 }
 
-async function createEvent(){
+async function submitCreateEvent(){
   const name=document.getElementById('ev-name').value.trim();
   const desc=document.getElementById('ev-desc').value.trim();
-  const capPw=document.getElementById('ev-cap-pw').value;
+  const capPw=document.getElementById('ev-cap-pw').value.trim();
   const num=parseInt(document.getElementById('ev-num-teams').value)||0;
   const names=Array.from(document.querySelectorAll('.cap-name-input')).map(i=>i.value.trim());
-  if(!name){toast('Enter event name',true);return;}
-  if(!capPw){toast('Set captain password',true);return;}
-  if(!num||num<1){toast('Enter number of teams',true);return;}
-  const fd=new FormData();
-  fd.append('name',name); fd.append('description',desc);
-  fd.append('captain_password',capPw); fd.append('num_teams',num);
-  fd.append('captain_names',JSON.stringify(names));
-  const res=await fetch('/api/events',{method:'POST',body:fd});
-  const data=await res.json();
-  if(res.ok){
-    toast(`Event "${name}" created · Code: ${data.access_code}`);
-    document.getElementById('ev-name').value=''; document.getElementById('ev-desc').value='';
-    document.getElementById('ev-cap-pw').value=''; document.getElementById('ev-num-teams').value='';
-    document.getElementById('captain-inputs').innerHTML='<div style="font-size:.8rem;color:var(--muted)">Enter number of teams first</div>';
-    loadEvents();
-    setTimeout(()=>window.location.href=`/event/${data.id}`,1000);
-  } else {toast(data.detail||'Error',true);}
+
+  if(!name){alert('Enter event name');return;}
+  if(!capPw){alert('Enter captain password');return;}
+  if(!num||num<1){alert('Enter number of teams');return;}
+
+  const btn=document.querySelector('[onclick="submitCreateEvent()"]');
+  if(btn){btn.disabled=true;btn.textContent='Creating…';}
+
+  try {
+    const fd=new FormData();
+    fd.append('name',name); fd.append('description',desc);
+    fd.append('captain_password',capPw); fd.append('num_teams',num);
+    fd.append('captain_names',JSON.stringify(names));
+    const res=await fetch('/api/events',{method:'POST',body:fd});
+    const data=await res.json();
+    if(res.ok){
+      alert(`Event "${name}" created!\nAccess code: ${data.access_code}`);
+      window.location.href=`/event/${data.id}`;
+    } else {
+      alert('Error: '+(data.detail||JSON.stringify(data)));
+    }
+  } catch(e) {
+    alert('Network error: '+e.message);
+  } finally {
+    if(btn){btn.disabled=false;btn.textContent='Create Event';}
+  }
 }
 
 async function deleteEvent(eid){

@@ -58,7 +58,7 @@ async function loadResults(){
   const res=await fetch(`/api/events/${eid}/results`);
   if(!res.ok){window.location.href='/';return;}
   data=await res.json();
-  standings=await fetch(`/api/events/${eid}/standings`).then(r=>r.json()).catch(()=>null);
+  standings=await fetch(`/api/events/${eid}/standings-full`).then(r=>r.json()).catch(()=>null);
   document.getElementById('ev-badge').textContent=data.event?.name||'Results';
   render();
 }
@@ -96,13 +96,17 @@ function render(){
   if(!data)return;
   const drafted=data.players.filter(p=>p.taken_by).length,total=data.players.length;
   document.getElementById('results-sub').textContent=`${data.event?.name||''} · ${drafted} of ${total} players · ${data.captains.length} teams`;
-  let html=`<div class="sort-bar"><span style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Sort:</span>`
+  // order: table → fixtures → player stats → squad list
+  let html='';
+  if(standings?.table?.length) html+=standingsHTML();
+  if(standings?.fixtures?.length) html+=fixturesHTML();
+
+  const sortBar=`<div class="sort-bar"><span style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Sort:</span>`
     +['year','position','name'].map(s=>`<button class="sort-btn ${currentSort===s?'active':''}" data-sort="${s}" onclick="setSort('${s}')">${s==='year'?'Batch Year':s==='position'?'Position':'Name'}</button>`).join('')
     +'</div>';
-  html+=`<div class="teams-grid" id="teams-wrap">${teamsInnerHTML()}</div>`;
+  html+=`<div class="section-title">Squad List</div>${sortBar}<div class="teams-grid" id="teams-wrap">${teamsInnerHTML()}</div>`;
   const ud=data.players.filter(p=>!p.taken_by);
   if(ud.length) html+=`<div class="section-title" style="color:var(--muted)">Undrafted (${ud.length})</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px" id="undrafted-wrap">${undraftedInnerHTML()}</div>`;
-  if(standings?.table?.length) html+=standingsHTML();
   document.getElementById('content').innerHTML=html;
 }
 
@@ -143,6 +147,26 @@ function standingsHTML(){
       <td class="mono" style="color:var(--lime)">${p.goals||0}</td><td class="mono">${p.assists||0}</td><td class="mono">${p.cleansheets||0}</td>
     </tr>`).join('')}</tbody></table>`;
   }
+  return h;
+}
+
+function fixturesHTML(){
+  const fx=standings.fixtures||[];
+  if(!fx.length) return '';
+  // build captain id->name map from data
+  const capMap={};(data.captains||[]).forEach(c=>capMap[c.id]=c.name);
+  let h='<div class="section-title">Fixtures</div>';
+  h+='<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:24px">';
+  h+=fx.map(f=>{
+    const score=f.status==='played'?`<strong style="color:var(--lime)">${f.home_score} — ${f.away_score}</strong>`:'<span style="color:var(--muted)">vs</span>';
+    return `<div style="background:var(--card);border:1px solid var(--border);border-radius:5px;padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:.75rem;color:var(--muted);min-width:80px">${f.match_date||'TBD'}</span>
+      <span style="font-weight:700;flex:1;text-align:right">${f.home_name||capMap[f.home_captain_id]||'?'}</span>
+      <span style="font-family:'Bebas Neue',sans-serif;font-size:1.3rem;min-width:60px;text-align:center">${score}</span>
+      <span style="font-weight:700;flex:1">${f.away_name||capMap[f.away_captain_id]||'?'}</span>
+    </div>`;
+  }).join('');
+  h+='</div>';
   return h;
 }
 

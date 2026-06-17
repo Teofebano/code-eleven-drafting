@@ -183,11 +183,8 @@
     <h3>Log Match Event</h3>
     <div class="form-group"><label>Team</label><select id="fe-captain" onchange="renderFEPlayers()"></select></div>
     <div class="form-group"><label>Player</label><select id="fe-player"></select></div>
-    <div class="grid-2">
-      <div class="form-group"><label>Event Type</label>
-        <select id="fe-type"><option value="goal">⚽ Goal</option><option value="assist">🎯 Assist</option><option value="cleansheet">🧤 Cleansheet</option></select>
-      </div>
-      <div class="form-group"><label>Minute</label><input type="number" id="fe-minute" placeholder="e.g. 45" min="1" max="120"/></div>
+    <div class="form-group"><label>Event Type</label>
+      <select id="fe-type"><option value="goal">⚽ Goal</option><option value="assist">🎯 Assist</option><option value="cleansheet">🧤 Cleansheet</option></select>
     </div>
     <div style="display:flex;gap:10px;margin-top:8px">
       <button class="btn btn-primary" onclick="addFixtureEvent()">Log</button>
