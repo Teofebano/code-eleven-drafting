@@ -161,24 +161,32 @@ function standingsHTML(){
   });
   h+='</tbody></table></div>';
   if(player_stats&&player_stats.length){
-    h+='<div class="section-title">Player Stats</div><div style="overflow-x:auto"><table>'
-      +'<thead><tr><th>Player</th><th>Pos</th><th>Year</th><th>Team</th><th>&#x26BD;</th><th>&#x1F3AF;</th><th>&#x1F9E4;</th></tr></thead><tbody>';
-    player_stats.slice(0,20).forEach(function(p){
+    function playerRow(p,col){
       var pl=(data.players||[]).find(function(x){return x.name===p.name;});
       var cap=pl&&window._capById?window._capById[pl.taken_by]:null;
       var teamName=cap?(cap.team_name||cap.name):'&mdash;';
       var pos=pl?pl.position:'';
-      var posClass2=({GK:'pos-gk',DEF:'pos-def',MID:'pos-mid',ATK:'pos-atk'})[pos]||'pos-unknown';
-      h+='<tr>'
+      var pc=({GK:'pos-gk',DEF:'pos-def',MID:'pos-mid',ATK:'pos-atk'})[pos]||'pos-unknown';
+      return '<tr>'
         +'<td><strong>'+p.name+'</strong></td>'
-        +'<td><span class="pos-badge '+posClass2+'">'+(pos||'&mdash;')+'</span></td>'
+        +'<td><span class="pos-badge '+pc+'">'+(pos||'&mdash;')+'</span></td>'
         +'<td class="mono" style="font-size:.78rem">'+(pl&&pl.batch_year?pl.batch_year:'&mdash;')+'</td>'
         +'<td><span style="display:inline-flex;align-items:center;gap:5px">'+(cap?logoImg(cap.team_logo,18):'')+teamName+'</span></td>'
-        +'<td class="mono" style="color:var(--lime)">'+(p.goals||0)+'</td>'
-        +'<td class="mono">'+(p.assists||0)+'</td>'
-        +'<td class="mono">'+(p.cleansheets||0)+'</td></tr>';
-    });
-    h+='</tbody></table></div>';
+        +'<td class="mono" style="color:var(--lime);font-weight:700">'+(p[col]||0)+'</td>'
+        +'</tr>';
+    }
+    function statSection(title,emoji,col){
+      var rows=player_stats.filter(function(p){return (p[col]||0)>0;}).sort(function(a,b){return (b[col]||0)-(a[col]||0);});
+      if(!rows.length) return '';
+      return '<div class="section-title">'+emoji+' '+title+'</div>'
+        +'<div style="overflow-x:auto"><table>'
+        +'<thead><tr><th>Player</th><th>Pos</th><th>Year</th><th>Team</th><th>'+emoji+'</th></tr></thead>'
+        +'<tbody>'+rows.slice(0,10).map(function(p){return playerRow(p,col);}).join('')+'</tbody>'
+        +'</table></div>';
+    }
+    h+=statSection('Top Scorers','&#x26BD;','goals');
+    h+=statSection('Top Assists','&#x1F3AF;','assists');
+    h+=statSection('Top Cleansheets','&#x1F9E4;','cleansheets');
   }
   return h;
 }
@@ -190,18 +198,21 @@ function fixturesHTML(){
   var h='<div class="section-title">Fixtures</div><div style="display:flex;flex-direction:column;gap:8px;margin-bottom:24px">';
   fx.forEach(function(f){
     var played=f.status==='played';
-    var score=played?('<strong style="color:var(--lime)">'+f.home_score+' &mdash; '+f.away_score+'</strong>'):'<span style="color:var(--muted)">vs</span>';
+    var score=played?('<strong style="color:var(--lime)">'+f.home_score+' &ndash; '+f.away_score+'</strong>'):'<span style="color:var(--muted)">vs</span>';
     var pitch=f.pitch_name?(f.pitch_url?('<a href="'+f.pitch_url+'" target="_blank" style="font-size:.72rem;color:var(--muted);text-decoration:none">&#128205; '+f.pitch_name+'</a>'):'<span style="font-size:.72rem;color:var(--muted)">&#128205; '+f.pitch_name+'</span>'):'';
     var homeCap=capMap[f.home_captain_id]; var awayCap=capMap[f.away_captain_id];
     var homeName=f.home_name||(homeCap&&(homeCap.team_name||homeCap.name))||'?';
     var awayName=f.away_name||(awayCap&&(awayCap.team_name||awayCap.name))||'?';
-    h+='<div style="background:var(--card);border:1px solid var(--border);border-radius:5px;padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
-      +'<div style="display:flex;flex-direction:column;gap:2px;min-width:80px">'
-        +'<span style="font-size:.75rem;color:var(--muted)">'+(f.match_date||'TBD')+'</span>'+pitch+'</div>'
-      +'<span style="display:inline-flex;align-items:center;gap:6px;font-weight:700;flex:1;justify-content:flex-end">'+homeName+(homeCap?logoImg(homeCap.team_logo,22):'')+'</span>'
-      +`<span style="font-family:'Bebas Neue',sans-serif;font-size:1.3rem;min-width:60px;text-align:center">${score}</span>`
-      +'<span style="display:inline-flex;align-items:center;gap:6px;font-weight:700;flex:1">'+(awayCap?logoImg(awayCap.team_logo,22):'')+awayName+'</span>'
-      +'</div>';
+    var homeLogo=homeCap?logoImg(homeCap.team_logo,24):'';
+    var awayLogo=awayCap?logoImg(awayCap.team_logo,24):'';
+    h+='<div style="background:var(--card);border:1px solid var(--border);border-radius:5px;padding:14px 16px;">'
+      +'<div style="font-size:.75rem;color:var(--muted);margin-bottom:10px">'+(f.match_date||'TBD')+(pitch?' &nbsp; '+pitch:'')+'</div>'
+      +'<div style="display:flex;align-items:center;gap:8px;">'
+        +'<span style="display:inline-flex;align-items:center;gap:6px;font-weight:700;flex:1;justify-content:flex-end;text-align:right">'+homeName+homeLogo+'</span>'
+        +'<span style="font-family:Bebas Neue,sans-serif;font-size:1.4rem;min-width:56px;text-align:center;flex-shrink:0">'+score+'</span>'
+        +'<span style="display:inline-flex;align-items:center;gap:6px;font-weight:700;flex:1">'+awayLogo+awayName+'</span>'
+      +'</div>'
+    +'</div>';
   });
   h+='</div>';
   return h;
