@@ -623,7 +623,14 @@ async def update_player_db(pid: str, name: str = Form(...), position: str = Form
     conn = get_db()
     conn.execute("UPDATE players_db SET name=?,position=?,batch_year=?,city=? WHERE id=?",
                  (name.strip(), position.upper(), batch_year, city.strip(), pid))
-    conn.commit(); conn.close(); return {"ok":True}
+    # sync all event_players rows that reference this player_db entry
+    conn.execute("""UPDATE event_players SET name=?, position=?, batch_year=?
+                    WHERE player_db_id=?""",
+                 (name.strip(), position.upper(), batch_year, pid))
+    conn.commit(); conn.close()
+    # broadcast update to all open event rooms
+    await mgr.broadcast("global", {"type": "players_db_updated", "player_db_id": pid})
+    return {"ok": True}
 
 @app.delete("/api/players-db/{pid}")
 async def delete_player_db(pid: str, auth=Depends(require_admin)):
@@ -652,6 +659,7 @@ async def import_players_db_csv(file: UploadFile = File(...), auth=Depends(requi
                 ex=conn.execute("SELECT id,city FROM players_db WHERE name=? AND batch_year=?",(n,y)).fetchone()
                 if ex:
                     conn.execute("UPDATE players_db SET position=?,city=? WHERE id=?",(p, city if city else ex["city"], ex["id"]))
+                    conn.execute("UPDATE event_players SET position=?,name=? WHERE player_db_id=?", (p, n, ex["id"]))
                     updated+=1
                 else:
                     conn.execute("INSERT INTO players_db(id,name,position,batch_year,city) VALUES(?,?,?,?,?)",
