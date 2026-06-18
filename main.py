@@ -539,10 +539,6 @@ async def delete_captain(eid: str, cid: str, auth=Depends(require_admin)):
 async def rename_team(eid: str, cid: str, body: dict, auth=Depends(require_admin)):
     team_name = body.get("team_name", "").strip() or None
     conn = get_db()
-    ev = conn.execute("SELECT status FROM events WHERE id=?", (eid,)).fetchone()
-    if not ev: conn.close(); raise HTTPException(404, "Event not found")
-    if ev["status"] != "done":
-        conn.close(); raise HTTPException(400, "Team renaming only allowed after draft is complete")
     conn.execute("UPDATE captains SET team_name=? WHERE id=? AND event_id=?", (team_name, cid, eid))
     conn.commit(); conn.close()
     await mgr.broadcast(f"event:{eid}", {"type":"captains_updated"})

@@ -27,6 +27,7 @@ function setupTabs(){
     t.classList.add('active'); document.getElementById('tab-'+t.dataset.tab).classList.add('active');
     if(t.dataset.tab==='fixtures-tab'){renderCaptainSelects();loadFixtures();}
     if(t.dataset.tab==='draft-ctrl') loadGame();
+    if(t.dataset.tab==='teams-mgmt') renderTeamsManagement();
   }));
 }
 
@@ -67,12 +68,14 @@ async function loadAll(){await Promise.all([loadPlayers(),loadGame()]);}
 async function loadPlayers(){
   players=await fetch(`/api/events/${eid}/players`).then(r=>r.json());
   renderPlayers();
+  renderTeamsManagement();
 }
 
 async function loadGame(){
   gameState=await fetch(`/api/events/${eid}/game`).then(r=>r.json());
   captains=gameState.captains||[];
   renderDraftControl();
+  renderTeamsManagement();
 }
 
 async function loadFixtures(){
@@ -127,17 +130,17 @@ function renderPlayers(){
   const cnt=document.getElementById('ep-count');
   if(cnt) cnt.textContent=`Roster (${players.length})`;
   if(!players.length){el.innerHTML='<div class="empty-state">No players.</div>';return;}
-  const capOpts='<option value="">— Unassigned —</option>'+captains.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
-  el.innerHTML=`<table><thead><tr><th>Name</th><th>Pos</th><th>Year</th><th>Group</th><th>Assign to</th><th></th></tr></thead>
+  el.innerHTML=`<table><thead><tr><th>Name</th><th>Pos</th><th>Year</th><th>Group</th><th>Team</th><th></th></tr></thead>
     <tbody>${players.map(p=>{
       const g=getGroup(p.batch_year);
-      const opts='<option value="">— Unassigned —</option>'+captains.map(c=>`<option value="${c.id}" ${p.taken_by===c.id?'selected':''}>${c.name}</option>`).join('');
+      const cap=captains.find(c=>c.id===p.taken_by);
+      const teamLabel=cap?(cap.team_name||cap.name):'—';
       return `<tr>
         <td><strong>${p.name}</strong></td>
         <td><span class="tag-pos">${p.position}</span></td>
         <td class="mono">${p.batch_year}</td>
         <td><span class="badge ${GROUP_BADGE[g]}">${GROUP_LABELS[g]}</span></td>
-        <td><select style="padding:5px 8px;font-size:.8rem;min-width:130px" onchange="assignPlayer('${p.id}',this.value)">${opts}</select></td>
+        <td style="color:${p.taken_by?'var(--lime)':'var(--muted)'};font-size:.85rem">${teamLabel}</td>
         <td><button class="btn btn-danger btn-sm" onclick="deleteEventPlayer('${p.id}')">✕</button></td>
       </tr>`;
     }).join('')}</tbody></table>`;
@@ -217,7 +220,6 @@ function renderDraftControl(){
   } else {oc.style.display='none';}
   renderLiveTeams();
   renderPickHistory(history||[]);
-  renderTeamRenames();
 }
 
 function renderAnswerLog(answers){
@@ -399,6 +401,55 @@ function renderStandings(){
       <td class="mono" style="color:var(--lime)">${p.goals||0}</td>
       <td class="mono">${p.assists||0}</td><td class="mono">${p.cleansheets||0}</td>
     </tr>`).join('')}</tbody></table>`;
+}
+
+// ── TEAMS MANAGEMENT ─────────────────────────────────────────────────────
+function renderTeamsManagement(){
+  const el=document.getElementById('teams-mgmt-content');
+  if(!el||!captains.length){if(el)el.innerHTML='<div class="empty-state">No teams yet.</div>';return;}
+  el.innerHTML=captains.map(c=>{
+    const dn=c.team_name||c.name;
+    const mine=players.filter(p=>p.taken_by===c.id);
+    const unassigned=players.filter(p=>!p.taken_by);
+    return `<div class="card" style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+        <div style="flex:1">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:1.5px;color:var(--lime)">${dn}</div>
+          <div style="font-size:.75rem;color:var(--muted)">Captain: ${c.name} &nbsp;·&nbsp; ${mine.length} players</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="renameTeam('${c.id}','${(c.team_name||c.name).replace(/'/g,String.fromCharCode(39))}')">✏️ Rename</button>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:.87rem">
+        <thead><tr>
+          <th style="text-align:left;padding:6px 10px;font-size:.7rem;color:var(--muted);border-bottom:1px solid var(--border)">Player</th>
+          <th style="text-align:left;padding:6px 10px;font-size:.7rem;color:var(--muted);border-bottom:1px solid var(--border)">Pos</th>
+          <th style="text-align:left;padding:6px 10px;font-size:.7rem;color:var(--muted);border-bottom:1px solid var(--border)">Year</th>
+          <th style="text-align:left;padding:6px 10px;font-size:.7rem;color:var(--muted);border-bottom:1px solid var(--border)">Move to</th>
+        </tr></thead>
+        <tbody>
+          ${mine.map(p=>`<tr>
+            <td style="padding:7px 10px"><strong>${p.name}</strong></td>
+            <td style="padding:7px 10px"><span class="tag-pos">${p.position}</span></td>
+            <td style="padding:7px 10px;font-family:'JetBrains Mono',monospace;font-size:.82rem">${p.batch_year||'—'}</td>
+            <td style="padding:7px 10px">
+              <select style="padding:4px 8px;font-size:.78rem;min-width:120px" onchange="assignPlayer('${p.id}',this.value)">
+                ${captains.map(x=>`<option value="${x.id}" ${x.id===c.id?'selected':''}>${x.team_name||x.name}</option>`).join('')}
+                <option value="">Unassign</option>
+              </select>
+            </td>
+          </tr>`).join('')}
+          ${!mine.length?`<tr><td colspan="4" style="padding:10px;color:var(--muted);font-size:.82rem;text-align:center">No players assigned</td></tr>`:''}
+        </tbody>
+      </table>
+      ${unassigned.length?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+        <div style="font-size:.75rem;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Quick assign</div>
+        <select style="padding:6px 10px;font-size:.82rem;min-width:200px" onchange="if(this.value){assignPlayer(this.value,'${c.id}');this.value='';}">
+          <option value="">+ Add player to this team</option>
+          ${unassigned.map(p=>`<option value="${p.id}">${p.name} (${p.position}, ${p.batch_year||'?'})</option>`).join('')}
+        </select>
+      </div>`:''}
+    </div>`;
+  }).join('');
 }
 
 // ── TEAM RENAME ──────────────────────────────────────────────────────────
