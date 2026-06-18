@@ -170,7 +170,8 @@ function teamsInnerHTML(){
   return '<div class="teams-grid">'+captains.map(c=>{
     const mine=sortPlayers((players||[]).filter(p=>p.taken_by===c.id));
     const dn=c.team_name||c.name;
-    return '<div class="team-col"><div class="team-header">'+dn+'<span class="mono" style="font-size:.78rem;color:var(--muted);font-weight:normal">'+mine.length+'</span></div>'
+    const logo=c.team_logo?`<img src="${c.team_logo}" onclick="zoomLogo('${c.team_logo}')" style="width:24px;height:24px;border-radius:3px;object-fit:cover;cursor:pointer;flex-shrink:0"/>`:""
+    return '<div class="team-col"><div class="team-header"><span style="display:inline-flex;align-items:center;gap:6px">'+logo+dn+'</span><span class="mono" style="font-size:.78rem;color:var(--muted);font-weight:normal">'+mine.length+'</span></div>'
       +(mine.length?mine.map(p=>'<div class="team-player"><span>'+p.name+'</span><div style="display:flex;gap:5px;align-items:center"><span class="pos-badge '+posClass(p.position)+'">'+(p.position||'?')+'</span><span class="year-tag">'+p.batch_year+'</span></div></div>').join('')
         :'<div style="font-size:.8rem;color:var(--muted);padding:6px 0">No picks</div>')+'</div>';
   }).join('')+'</div>';
@@ -190,6 +191,7 @@ async function pickPlayer(pid){
   if(!res.ok){const d=await res.json();toast(d.detail||'Pick failed',true);}
 }
 
+function zoomLogo(url){const o=document.createElement('div');o.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:pointer';o.innerHTML=`<img src="${url}" style="max-width:90vw;max-height:90vh;border-radius:10px"/>`;o.onclick=()=>document.body.removeChild(o);document.body.appendChild(o);}
 async function logout(){await fetch('/api/auth/logout',{method:'POST'});window.location.href='/';}
 function toast(msg,e=false){const el=document.getElementById('toast');el.textContent=msg;el.className='show'+(e?' error':'');clearTimeout(toast._t);toast._t=setTimeout(()=>el.className='',2800);}
 init();

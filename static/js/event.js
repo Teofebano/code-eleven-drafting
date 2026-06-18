@@ -4,6 +4,16 @@ const GROUP_BADGE={g1:'badge-g1',g2:'badge-g2',g3:'badge-g3'};
 const MCQ_SECONDS=15;
 
 let eid=null, eventData=null, gameState=null, ws=null;
+
+function teamLogoImg(c, size=24){
+  if(!c||!c.team_logo) return '';
+  return `<img src="${c.team_logo}" onclick="zoomLogo('${c.team_logo}')" style="width:${size}px;height:${size}px;border-radius:3px;object-fit:cover;cursor:pointer;flex-shrink:0" title="Click to zoom"/>`;
+}
+function teamDisplay(c, size=24){
+  const name=c.team_name||c.name;
+  const logo=teamLogoImg(c,size);
+  return `<span style="display:inline-flex;align-items:center;gap:6px">${logo}${name}</span>`;
+}
 let captains=[], players=[], fixtures=[], standings=null;
 let timerInterval=null, timerEnd=null, pendingOrder=[], dragSrcIdx=null;
 let activeFixtureId=null, dbSearchResults=[];
@@ -265,8 +275,7 @@ function renderLiveTeams(){
   const pls=gameState?.players||[];
   el.innerHTML='<div class="teams-grid">'+captains.map(c=>{
     const mine=pls.filter(p=>p.taken_by===c.id);
-    const displayName=c.team_name||c.name;
-    return `<div class="team-col"><div class="team-header">${displayName}<span class="mono" style="font-size:.8rem;color:var(--muted);font-weight:normal">${mine.length}</span></div>
+    return `<div class="team-col"><div class="team-header">${teamDisplay(c)}<span class="mono" style="font-size:.8rem;color:var(--muted);font-weight:normal">${mine.length}</span></div>
       ${mine.length?mine.map(p=>`<div class="team-player"><span>${p.name}</span><span class="tag-pos">${p.position}</span></div>`).join(''):'<div style="font-size:.8rem;color:var(--muted);padding:6px 0">No picks</div>'}
     </div>`;
   }).join('')+'</div>';
@@ -287,7 +296,7 @@ function renderPickHistory(hist){
 function renderCaptainSelects(){
   ['fixture-home','fixture-away','fe-captain'].forEach(id=>{
     const s=document.getElementById(id);
-    if(s) s.innerHTML='<option value="">— Select —</option>'+captains.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    if(s) s.innerHTML='<option value="">— Select —</option>'+captains.map(c=>`<option value="${c.id}">${c.team_name||c.name}</option>`).join('');
   });
 }
 
@@ -356,11 +365,11 @@ function renderFixtures(){
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <div style="font-size:.75rem;color:var(--muted);min-width:80px">${f.match_date||'TBD'}</div>
       <div style="flex:1;display:flex;align-items:center;gap:10px;justify-content:center">
-        <span style="font-weight:700;text-align:right;flex:1">${f.home_name}</span>
+        <span style="display:inline-flex;align-items:center;gap:6px;font-weight:700;text-align:right;flex:1;justify-content:flex-end">${f.home_name}${(()=>{const c=captains.find(x=>(x.team_name||x.name)===f.home_name);return c&&c.team_logo?`<img src="${c.team_logo}" onclick="zoomLogo('${c.team_logo}')" style="width:22px;height:22px;border-radius:3px;object-fit:cover;cursor:pointer"/>`:''})()}</span>
         <span style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;color:${f.status==='played'?'var(--lime)':'var(--muted)'};min-width:60px;text-align:center">
           ${f.status==='played'?`${f.home_score} — ${f.away_score}`:'vs'}
         </span>
-        <span style="font-weight:700;flex:1">${f.away_name}</span>
+        <span style="display:inline-flex;align-items:center;gap:6px;font-weight:700;flex:1">${(()=>{const c=captains.find(x=>(x.team_name||x.name)===f.away_name);return c&&c.team_logo?`<img src="${c.team_logo}" onclick="zoomLogo('${c.team_logo}')" style="width:22px;height:22px;border-radius:3px;object-fit:cover;cursor:pointer"/>`:''})()}${f.away_name}</span>
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
         ${f.pitch_name?`<a href="${f.pitch_url||'#'}" target="_blank" style="font-size:.75rem;color:var(--muted);text-decoration:none;border:1px solid var(--border);border-radius:3px;padding:3px 8px" title="${f.pitch_url||'No link'}">📍 ${f.pitch_name}</a>`:''}
@@ -380,6 +389,13 @@ function renderFixtures(){
   </div>`).join('');
 }
 
+function teamCellAdmin(name,size){
+  size=size||20;
+  const cap=captains.find(c=>(c.team_name||c.name)===name);
+  const logo=cap&&cap.team_logo?`<img src="${cap.team_logo}" onclick="zoomLogo('${cap.team_logo}')" style="width:${size}px;height:${size}px;border-radius:3px;object-fit:cover;cursor:pointer;flex-shrink:0"/>`:'';
+  return `<span style="display:inline-flex;align-items:center;gap:6px">${logo}<strong>${name}</strong></span>`;
+}
+
 function renderStandings(){
   if(!standings) return;
   const{table,player_stats}=standings;
@@ -388,7 +404,8 @@ function renderStandings(){
   el.innerHTML=`<div style="overflow-x:auto"><table>
     <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th></tr></thead>
     <tbody>${table.map((t,i)=>`<tr style="${i===0?'background:rgba(184,255,63,.05)':''}">
-      <td class="mono" style="color:var(--muted)">${i+1}</td><td><strong>${t.name}</strong></td>
+      <td class="mono" style="color:var(--muted)">${i+1}</td>
+      <td>${teamCellAdmin(t.name)}</td>
       <td class="mono">${t.p}</td><td class="mono">${t.w}</td><td class="mono">${t.d}</td><td class="mono">${t.l}</td>
       <td class="mono">${t.gf}</td><td class="mono">${t.ga}</td>
       <td class="mono" style="color:${t.gd>0?'var(--lime)':t.gd<0?'var(--danger)':'var(--muted)'}">${t.gd>0?'+':''}${t.gd}</td>
@@ -396,11 +413,25 @@ function renderStandings(){
     </tr>`).join('')}</tbody></table></div>`;
   const ps=document.getElementById('player-stats-table');
   if(!player_stats.length){ps.innerHTML='<div class="empty-state">No stats yet.</div>';return;}
-  ps.innerHTML=`<table><thead><tr><th>Player</th><th>⚽</th><th>🎯</th><th>🧤</th></tr></thead>
-    <tbody>${player_stats.slice(0,20).map(p=>`<tr><td><strong>${p.name}</strong></td>
-      <td class="mono" style="color:var(--lime)">${p.goals||0}</td>
-      <td class="mono">${p.assists||0}</td><td class="mono">${p.cleansheets||0}</td>
-    </tr>`).join('')}</tbody></table>`;
+  ps.innerHTML=`<div style="overflow-x:auto"><table>
+    <thead><tr><th>Player</th><th>Pos</th><th>Year</th><th>Team</th><th>⚽</th><th>🎯</th><th>🧤</th></tr></thead>
+    <tbody>${player_stats.slice(0,20).map(p=>{
+      const pl=players.find(x=>x.name===p.name);
+      const cap=pl?captains.find(c=>c.id===pl.taken_by):null;
+      const teamName=cap?(cap.team_name||cap.name):'—';
+      const pos=pl?pl.position:'';
+      const posClass2=({GK:'pos-gk',DEF:'pos-def',MID:'pos-mid',ATK:'pos-atk'})[pos]||'pos-unknown';
+      return `<tr>
+        <td><strong>${p.name}</strong></td>
+        <td><span class="pos-badge ${posClass2}">${pos||'—'}</span></td>
+        <td class="mono" style="font-size:.78rem">${pl&&pl.batch_year?pl.batch_year:'—'}</td>
+        <td><span style="display:inline-flex;align-items:center;gap:5px">${cap&&cap.team_logo?`<img src="${cap.team_logo}" onclick="zoomLogo('${cap.team_logo}')" style="width:18px;height:18px;border-radius:2px;object-fit:cover;cursor:pointer"/>`:''
+          }${teamName}</span></td>
+        <td class="mono" style="color:var(--lime)">${p.goals||0}</td>
+        <td class="mono">${p.assists||0}</td>
+        <td class="mono">${p.cleansheets||0}</td>
+      </tr>`;
+    }).join('')}</tbody></table></div>`;
 }
 
 // ── TEAMS MANAGEMENT ─────────────────────────────────────────────────────
@@ -411,13 +442,21 @@ function renderTeamsManagement(){
     const dn=c.team_name||c.name;
     const mine=players.filter(p=>p.taken_by===c.id);
     const unassigned=players.filter(p=>!p.taken_by);
+    const logoHtml=c.team_logo
+      ?`<img src="${c.team_logo}" style="width:52px;height:52px;border-radius:6px;object-fit:cover;border:1.5px solid var(--border);cursor:pointer" onclick="zoomLogo('${c.team_logo}')" title="Click to zoom"/>`
+      :`<div style="width:52px;height:52px;border-radius:6px;border:1.5px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:1.4rem;cursor:pointer" onclick="uploadLogo('${c.id}')" title="Upload logo">🛡️</div>`;
     return `<div class="card" style="margin-bottom:16px">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+        ${logoHtml}
         <div style="flex:1">
           <div style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:1.5px;color:var(--lime)">${dn}</div>
           <div style="font-size:.75rem;color:var(--muted)">Captain: ${c.name} &nbsp;·&nbsp; ${mine.length} players</div>
         </div>
-        <button class="btn btn-secondary btn-sm" onclick="renameTeam('${c.id}','${(c.team_name||c.name).replace(/'/g,String.fromCharCode(39))}')">✏️ Rename</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" onclick="uploadLogo('${c.id}')">🖼 Logo</button>
+          ${c.team_logo?`<button class="btn btn-danger btn-sm" onclick="deleteLogo('${c.id}')">✕ Logo</button>`:''}
+          <button class="btn btn-secondary btn-sm" onclick="renameTeam('${c.id}','${(c.team_name||c.name).replace(/'/g,String.fromCharCode(39))}')">✏️ Rename</button>
+        </div>
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:.87rem">
         <thead><tr>
@@ -452,6 +491,27 @@ function renderTeamsManagement(){
   }).join('');
 }
 
+// ── TEAM LOGO ─────────────────────────────────────────────────────────────
+async function uploadLogo(cid){
+  const input=document.createElement('input');
+  input.type='file'; input.accept='image/jpeg,image/png,image/webp,image/gif';
+  input.onchange=async()=>{
+    const file=input.files[0]; if(!file) return;
+    if(file.size>2*1024*1024){toast('Max 2MB',true);return;}
+    const fd=new FormData(); fd.append('file',file);
+    const res=await fetch(`/api/events/${eid}/captains/${cid}/logo`,{method:'POST',body:fd});
+    if(res.ok){toast('Logo uploaded');loadGame();}
+    else{const d=await res.json();toast(d.detail||'Upload failed',true);}
+  };
+  input.click();
+}
+
+async function deleteLogo(cid){
+  if(!confirm('Remove team logo?')) return;
+  await fetch(`/api/events/${eid}/captains/${cid}/logo`,{method:'DELETE'});
+  toast('Logo removed'); loadGame();
+}
+
 // ── TEAM RENAME ──────────────────────────────────────────────────────────
 async function renameTeam(cid, currentName){
   const newName = prompt(`Team name for ${currentName}:`, currentName);
@@ -484,6 +544,15 @@ function renderTeamRenames(){
         </div>`;
       }).join('')
     + `</div>`;
+}
+
+// ── LOGO ZOOM ─────────────────────────────────────────────────────────────
+function zoomLogo(url){
+  const overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:pointer';
+  overlay.innerHTML=`<img src="${url}" style="max-width:90vw;max-height:90vh;border-radius:10px;box-shadow:0 0 60px rgba(0,0,0,.8)"/>`;
+  overlay.onclick=()=>document.body.removeChild(overlay);
+  document.body.appendChild(overlay);
 }
 
 // ── RESTORE ───────────────────────────────────────────────────────────────

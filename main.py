@@ -70,6 +70,7 @@ def init_db():
         event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
         team_name TEXT DEFAULT NULL,
+        team_logo TEXT DEFAULT NULL,
         team_number INTEGER NOT NULL DEFAULT 1
     );
     CREATE TABLE IF NOT EXISTS event_players (
@@ -128,13 +129,15 @@ def init_db():
         minute INTEGER DEFAULT NULL
     );
     """)
-    # Add team_name column to captains if missing
+    # Add team_name and team_logo columns to captains if missing
     try:
         cap_cols2 = [r[1] for r in c.execute("PRAGMA table_info(captains)").fetchall()]
         if cap_cols2 and "team_name" not in cap_cols2:
             c.execute("ALTER TABLE captains ADD COLUMN team_name TEXT DEFAULT NULL")
+        if cap_cols2 and "team_logo" not in cap_cols2:
+            c.execute("ALTER TABLE captains ADD COLUMN team_logo TEXT DEFAULT NULL")
     except Exception as e:
-        print(f"team_name migration note: {e}")
+        print(f"captains column migration note: {e}")
 
     # Add pitch columns to fixtures if missing
     try:
@@ -327,6 +330,13 @@ async def lifespan(app):
 app = FastAPI(lifespan=lifespan, title="Code Eleven Draft")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/logos/{filename}")
+async def serve_logo(filename: str):
+    from fastapi.responses import FileResponse
+    path = Path("data/logos") / filename
+    if not path.exists(): raise HTTPException(404, "Logo not found")
+    return FileResponse(path)
 
 async def _html(p):
     async with aiofiles.open(p,"r") as f: return await f.read()
@@ -540,6 +550,44 @@ async def rename_team(eid: str, cid: str, body: dict, auth=Depends(require_admin
     team_name = body.get("team_name", "").strip() or None
     conn = get_db()
     conn.execute("UPDATE captains SET team_name=? WHERE id=? AND event_id=?", (team_name, cid, eid))
+    conn.commit(); conn.close()
+    await mgr.broadcast(f"event:{eid}", {"type":"captains_updated"})
+    return {"ok": True}
+
+@app.post("/api/events/{eid}/captains/{cid}/logo")
+async def upload_team_logo(eid: str, cid: str, file: UploadFile = File(...), auth=Depends(require_admin)):
+    import shutil
+    # validate file type
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+    if ext not in ("jpg", "jpeg", "png", "webp", "gif"):
+        raise HTTPException(400, "Only jpg, png, webp, gif allowed")
+    # check size (read first 2MB + 1 byte)
+    data = await file.read(2 * 1024 * 1024 + 1)
+    if len(data) > 2 * 1024 * 1024:
+        raise HTTPException(400, "Max file size is 2MB")
+    logos_dir = Path("data/logos")
+    logos_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"{cid}.{ext}"
+    filepath = logos_dir / filename
+    with open(filepath, "wb") as f:
+        f.write(data)
+    logo_url = f"/logos/{filename}"
+    conn = get_db()
+    conn.execute("UPDATE captains SET team_logo=? WHERE id=? AND event_id=?", (logo_url, cid, eid))
+    conn.commit(); conn.close()
+    await mgr.broadcast(f"event:{eid}", {"type":"captains_updated"})
+    return {"ok": True, "logo_url": logo_url}
+
+@app.delete("/api/events/{eid}/captains/{cid}/logo")
+async def delete_team_logo(eid: str, cid: str, auth=Depends(require_admin)):
+    conn = get_db()
+    cap = conn.execute("SELECT team_logo FROM captains WHERE id=?", (cid,)).fetchone()
+    if cap and cap["team_logo"]:
+        try:
+            path = Path("data") / cap["team_logo"].lstrip("/")
+            if path.exists(): path.unlink()
+        except Exception: pass
+    conn.execute("UPDATE captains SET team_logo=NULL WHERE id=? AND event_id=?", (cid, eid))
     conn.commit(); conn.close()
     await mgr.broadcast(f"event:{eid}", {"type":"captains_updated"})
     return {"ok": True}
