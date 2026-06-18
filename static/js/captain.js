@@ -169,7 +169,8 @@ function teamsInnerHTML(){
   if(!captains||!captains.length) return '';
   return '<div class="teams-grid">'+captains.map(c=>{
     const mine=sortPlayers((players||[]).filter(p=>p.taken_by===c.id));
-    return '<div class="team-col"><div class="team-header">'+c.name+'<span class="mono" style="font-size:.78rem;color:var(--muted);font-weight:normal">'+mine.length+'</span></div>'
+    const dn=c.team_name||c.name;
+    return '<div class="team-col"><div class="team-header">'+dn+'<span class="mono" style="font-size:.78rem;color:var(--muted);font-weight:normal">'+mine.length+'</span></div>'
       +(mine.length?mine.map(p=>'<div class="team-player"><span>'+p.name+'</span><div style="display:flex;gap:5px;align-items:center"><span class="pos-badge '+posClass(p.position)+'">'+(p.position||'?')+'</span><span class="year-tag">'+p.batch_year+'</span></div></div>').join('')
         :'<div style="font-size:.8rem;color:var(--muted);padding:6px 0">No picks</div>')+'</div>';
   }).join('')+'</div>';

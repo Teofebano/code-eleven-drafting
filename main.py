@@ -69,6 +69,7 @@ def init_db():
         id TEXT PRIMARY KEY,
         event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
+        team_name TEXT DEFAULT NULL,
         team_number INTEGER NOT NULL DEFAULT 1
     );
     CREATE TABLE IF NOT EXISTS event_players (
@@ -127,6 +128,14 @@ def init_db():
         minute INTEGER DEFAULT NULL
     );
     """)
+    # Add team_name column to captains if missing
+    try:
+        cap_cols2 = [r[1] for r in c.execute("PRAGMA table_info(captains)").fetchall()]
+        if cap_cols2 and "team_name" not in cap_cols2:
+            c.execute("ALTER TABLE captains ADD COLUMN team_name TEXT DEFAULT NULL")
+    except Exception as e:
+        print(f"team_name migration note: {e}")
+
     # Add pitch columns to fixtures if missing
     try:
         fx_cols = [r[1] for r in c.execute("PRAGMA table_info(fixtures)").fetchall()]
@@ -526,6 +535,19 @@ async def delete_captain(eid: str, cid: str, auth=Depends(require_admin)):
     await mgr.broadcast(f"event:{eid}", {"type":"captains_updated"})
     return {"ok":True}
 
+@app.put("/api/events/{eid}/captains/{cid}/team-name")
+async def rename_team(eid: str, cid: str, body: dict, auth=Depends(require_admin)):
+    team_name = body.get("team_name", "").strip() or None
+    conn = get_db()
+    ev = conn.execute("SELECT status FROM events WHERE id=?", (eid,)).fetchone()
+    if not ev: conn.close(); raise HTTPException(404, "Event not found")
+    if ev["status"] != "done":
+        conn.close(); raise HTTPException(400, "Team renaming only allowed after draft is complete")
+    conn.execute("UPDATE captains SET team_name=? WHERE id=? AND event_id=?", (team_name, cid, eid))
+    conn.commit(); conn.close()
+    await mgr.broadcast(f"event:{eid}", {"type":"captains_updated"})
+    return {"ok": True}
+
 # ── PLAYERS DB ────────────────────────────────────────────────────────────
 @app.get("/api/players-db")
 async def list_players_db(q: str = "", auth=Depends(require_admin)):
@@ -850,7 +872,9 @@ async def pick_player(eid: str, body: dict, auth=Depends(require_captain)):
 @app.get("/api/events/{eid}/fixtures")
 async def list_fixtures(eid: str, token: str = Cookie(default=None)):
     conn=get_db()
-    rows=conn.execute("""SELECT f.*,ch.name as home_name,ca.name as away_name
+    rows=conn.execute("""SELECT f.*,
+        COALESCE(ch.team_name, ch.name) as home_name,
+        COALESCE(ca.team_name, ca.name) as away_name
         FROM fixtures f JOIN captains ch ON f.home_captain_id=ch.id JOIN captains ca ON f.away_captain_id=ca.id
         WHERE f.event_id=? ORDER BY f.match_date,f.created_at""",(eid,)).fetchall()
     result=[]
@@ -904,7 +928,7 @@ async def delete_fixture_event(eid: str, fid: str, evid: str, auth=Depends(requi
 @app.get("/api/events/{eid}/standings")
 async def get_standings(eid: str, token: str = Cookie(default=None)):
     conn=get_db()
-    caps={c["id"]:c["name"] for c in conn.execute("SELECT id,name FROM captains WHERE event_id=?",(eid,)).fetchall()}
+    caps={c["id"]:(c["team_name"] or c["name"]) for c in conn.execute("SELECT id,name,team_name FROM captains WHERE event_id=?",(eid,)).fetchall()}
     fixtures=conn.execute("SELECT * FROM fixtures WHERE event_id=? AND status='played'",(eid,)).fetchall()
     stats={cid:{"name":name,"p":0,"w":0,"d":0,"l":0,"gf":0,"ga":0,"pts":0} for cid,name in caps.items()}
     for f in fixtures:
@@ -953,7 +977,7 @@ async def get_standings_full(eid: str, token: str = Cookie(default=None)):
     d=decode_token(token)
     if not d or d.get("role") not in ("viewer","captain","admin"): raise HTTPException(403,"Login required")
     conn=get_db()
-    caps={c["id"]:c["name"] for c in conn.execute("SELECT id,name FROM captains WHERE event_id=?",(eid,)).fetchall()}
+    caps={c["id"]:(c["team_name"] or c["name"]) for c in conn.execute("SELECT id,name,team_name FROM captains WHERE event_id=?",(eid,)).fetchall()}
     fixtures_raw=conn.execute("""SELECT f.*,ch.name as home_name,ca.name as away_name
         FROM fixtures f JOIN captains ch ON f.home_captain_id=ch.id JOIN captains ca ON f.away_captain_id=ca.id
         WHERE f.event_id=? ORDER BY f.match_date,f.created_at""",(eid,)).fetchall()

@@ -217,6 +217,7 @@ function renderDraftControl(){
   } else {oc.style.display='none';}
   renderLiveTeams();
   renderPickHistory(history||[]);
+  renderTeamRenames();
 }
 
 function renderAnswerLog(answers){
@@ -262,7 +263,8 @@ function renderLiveTeams(){
   const pls=gameState?.players||[];
   el.innerHTML='<div class="teams-grid">'+captains.map(c=>{
     const mine=pls.filter(p=>p.taken_by===c.id);
-    return `<div class="team-col"><div class="team-header">${c.name}<span class="mono" style="font-size:.8rem;color:var(--muted);font-weight:normal">${mine.length}</span></div>
+    const displayName=c.team_name||c.name;
+    return `<div class="team-col"><div class="team-header">${displayName}<span class="mono" style="font-size:.8rem;color:var(--muted);font-weight:normal">${mine.length}</span></div>
       ${mine.length?mine.map(p=>`<div class="team-player"><span>${p.name}</span><span class="tag-pos">${p.position}</span></div>`).join(''):'<div style="font-size:.8rem;color:var(--muted);padding:6px 0">No picks</div>'}
     </div>`;
   }).join('')+'</div>';
@@ -397,6 +399,40 @@ function renderStandings(){
       <td class="mono" style="color:var(--lime)">${p.goals||0}</td>
       <td class="mono">${p.assists||0}</td><td class="mono">${p.cleansheets||0}</td>
     </tr>`).join('')}</tbody></table>`;
+}
+
+// ── TEAM RENAME ──────────────────────────────────────────────────────────
+async function renameTeam(cid, currentName){
+  const newName = prompt(`Team name for ${currentName}:`, currentName);
+  if(!newName || newName.trim() === currentName) return;
+  const res = await fetch(`/api/events/${eid}/captains/${cid}/team-name`, {
+    method:'PUT', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({team_name: newName.trim()})
+  });
+  if(res.ok){ toast(`Team renamed to "${newName.trim()}"`); loadGame(); }
+  else { const d=await res.json(); toast(d.detail||'Error',true); }
+}
+
+function renderTeamRenames(){
+  const phase = gameState?.phase;
+  const el = document.getElementById('team-rename-section');
+  if(!el) return;
+  if(phase !== 'done'){ el.style.display='none'; return; }
+  el.style.display='block';
+  el.innerHTML = `<div class="card-title" style="margin-bottom:12px">Rename Teams</div>`
+    + `<p style="font-size:.82rem;color:var(--muted);margin-bottom:14px">Draft is complete. Captains can now give their team a custom name.</p>`
+    + `<div style="display:flex;flex-direction:column;gap:8px">`
+    + captains.map(c => {
+        const display = c.team_name || c.name;
+        return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+          <div style="flex:1">
+            <span style="font-weight:700;color:var(--lime)">${display}</span>
+            ${c.team_name ? `<span style="font-size:.75rem;color:var(--muted);margin-left:8px">(captain: ${c.name})</span>` : ''}
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="renameTeam('${c.id}','${(c.team_name||c.name).replace(/'/g,"\'")}')">Rename</button>
+        </div>`;
+      }).join('')
+    + `</div>`;
 }
 
 // ── RESTORE ───────────────────────────────────────────────────────────────

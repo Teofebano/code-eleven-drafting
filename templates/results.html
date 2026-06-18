@@ -114,7 +114,8 @@ function teamsInnerHTML(){
   if(!data?.captains?.length) return '<div class="empty-state">No teams yet.</div>';
   return data.captains.map(cap=>{
     const mine=sortPlayers(data.players.filter(p=>p.taken_by===cap.id));
-    return `<div class="team-card"><div class="team-card-header">${cap.name}<span class="mono" style="font-size:.82rem;color:var(--muted);font-weight:normal">${mine.length}</span></div>
+    const displayName=cap.team_name||cap.name;
+    return `<div class="team-card"><div class="team-card-header">${displayName}<span class="mono" style="font-size:.82rem;color:var(--muted);font-weight:normal">${mine.length}</span></div>
       ${mine.length?mine.map(p=>`<div class="team-player-row"><span style="font-weight:600">${p.name}</span>
         <div style="display:flex;align-items:center;gap:6px"><span class="pos-badge ${posClass(p.position)}">${p.position||'?'}</span><span class="year-tag">${p.batch_year}</span></div>
       </div>`).join(''):'<div style="padding:12px 16px;font-size:.82rem;color:var(--muted)">No players yet</div>'}
