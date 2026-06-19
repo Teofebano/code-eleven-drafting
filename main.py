@@ -1030,7 +1030,7 @@ async def get_standings_full(eid: str, token: str = Cookie(default=None)):
     if not d or d.get("role") not in ("viewer","captain","admin"): raise HTTPException(403,"Login required")
     conn=get_db()
     caps={c["id"]:(c["team_name"] or c["name"]) for c in conn.execute("SELECT id,name,team_name FROM captains WHERE event_id=?",(eid,)).fetchall()}
-    fixtures_raw=conn.execute("""SELECT f.*,ch.name as home_name,ca.name as away_name
+    fixtures_raw=conn.execute("""SELECT f.*,COALESCE(ch.team_name,ch.name) as home_name,COALESCE(ca.team_name,ca.name) as away_name
         FROM fixtures f JOIN captains ch ON f.home_captain_id=ch.id JOIN captains ca ON f.away_captain_id=ca.id
         WHERE f.event_id=? ORDER BY f.match_date,f.created_at""",(eid,)).fetchall()
     fixtures=[dict(r) for r in fixtures_raw]
