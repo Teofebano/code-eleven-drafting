@@ -334,9 +334,14 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.get("/logos/{filename}")
 async def serve_logo(filename: str):
     from fastapi.responses import FileResponse
+    from fastapi import Response
     path = Path("data/logos") / filename
     if not path.exists(): raise HTTPException(404, "Logo not found")
-    return FileResponse(path)
+    resp = FileResponse(path)
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 async def _html(p):
     async with aiofiles.open(p,"r") as f: return await f.read()
@@ -567,7 +572,13 @@ async def upload_team_logo(eid: str, cid: str, file: UploadFile = File(...), aut
         raise HTTPException(400, "Max file size is 2MB")
     logos_dir = Path("data/logos")
     logos_dir.mkdir(parents=True, exist_ok=True)
-    filename = f"{cid}.{ext}"
+    # delete old logo file if exists (any extension)
+    for old_file in logos_dir.glob(f"{cid}.*"):
+        try: old_file.unlink()
+        except: pass
+    # timestamp in filename busts browser cache on every upload
+    ts = int(time.time())
+    filename = f"{cid}_{ts}.{ext}"
     filepath = logos_dir / filename
     with open(filepath, "wb") as f:
         f.write(data)
