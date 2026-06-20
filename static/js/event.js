@@ -90,9 +90,11 @@ async function loadGame(){
 
 async function loadFixtures(){
   if (!eid) return;
-  gameweeks = await fetch(`/api/events/${eid}/gameweeks`).then(r=>r.json());
+  const gwRes = await fetch(`/api/events/${eid}/gameweeks`).then(r=>r.json()).catch(()=>[]);
+  gameweeks = Array.isArray(gwRes) ? gwRes : [];
   standings  = await fetch(`/api/events/${eid}/standings`).then(r=>r.json()).catch(()=>null);
-  shuttleRoutes = await fetch(`/api/events/${eid}/shuttle-routes`).then(r=>r.json()).catch(()=>[]);
+  const srRes = await fetch(`/api/events/${eid}/shuttle-routes`).then(r=>r.json()).catch(()=>[]);
+  shuttleRoutes = Array.isArray(srRes) ? srRes : [];
   renderGameweeks(); renderStandings(); renderShuttleRoutes(); renderGWSelect();
 }
 
@@ -304,12 +306,12 @@ function renderCaptainSelects(){
 
 async function addGameweek(){
   const date=document.getElementById('gw-date').value;
-  const notes=document.getElementById('gw-notes').value.trim();
-  const fd=new FormData(); fd.append('match_date',date); fd.append('notes',notes);
+  const fd=new FormData(); fd.append('match_date',date); fd.append('notes','');
   const res=await fetch(`/api/events/${eid}/gameweeks`,{method:'POST',body:fd});
   const data=await res.json();
-  toast('GW'+data.number+' added');
-  document.getElementById('gw-date').value=''; document.getElementById('gw-notes').value='';
+  if(!res.ok){toast(data.detail||'Failed to add gameweek',true);return;}
+  toast(`GW${data.number} added`);
+  document.getElementById('gw-date').value='';
   loadFixtures();
 }
 
@@ -368,7 +370,7 @@ function renderShuttleRoutes(){
   const el=document.getElementById('shuttle-routes-list');
   if(!el) return;
   if(!shuttleRoutes.length){el.innerHTML='<div style="font-size:.82rem;color:var(--muted)">No routes yet.</div>';return;}
-  el.innerHTML=shuttleRoutes.map(r=>'<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="flex:1;font-size:.88rem">'+r.label+'</span><button class="btn btn-danger btn-sm" onclick="deleteShuttleRoute(''+r.id+'')">Remove</button></div>').join('');
+  el.innerHTML=shuttleRoutes.map(r=>'<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="flex:1;font-size:.88rem">'+r.label+'</span><button class="btn btn-danger btn-sm" data-rid="'+r.id+'" onclick="deleteShuttleRoute(this.dataset.rid)">Remove</button></div>').join('');
 }
 
 function renderGameweeks(){
@@ -376,40 +378,58 @@ function renderGameweeks(){
   if(!el) return;
   if(!gameweeks.length){el.innerHTML='<div class="empty-state">No gameweeks yet. Add one above.</div>';return;}
   el.innerHTML=gameweeks.map(gw=>{
-    const gwLabel='GW'+gw.number+(gw.match_date?' · '+gw.match_date:'')+(gw.notes?' · '+gw.notes:'');
+    const gwLabel=`GW${gw.number}${gw.match_date?' · '+gw.match_date:''}${gw.notes?' · '+gw.notes:''}`;
     const shuttleByRoute={};
-    (gw.shuttle||[]).forEach(function(s){ if(!shuttleByRoute[s.route_label]) shuttleByRoute[s.route_label]=[]; shuttleByRoute[s.route_label].push(s); });
+    (gw.shuttle||[]).forEach(s=>{ if(!shuttleByRoute[s.route_label]) shuttleByRoute[s.route_label]=[]; shuttleByRoute[s.route_label].push(s); });
     const fxHtml=gw.fixtures.length?gw.fixtures.map(f=>{
-      const score=f.status==='played'?'<strong style="color:var(--lime)">'+f.home_score+' — '+f.away_score+'</strong>':'<span style="color:var(--muted)">vs</span>';
-      const pitch=f.pitch_name?(f.pitch_url?'<a href="'+f.pitch_url+'" target="_blank" style="font-size:.72rem;color:var(--muted);text-decoration:none">📍 '+f.pitch_name+'</a>':'<span style="font-size:.72rem;color:var(--muted)">📍 '+f.pitch_name+'</span>'):'';
+      const score=f.status==='played'?`<strong style="color:var(--lime)">${f.home_score} — ${f.away_score}</strong>`:'<span style="color:var(--muted)">vs</span>';
+      const pitch=f.pitch_name?(f.pitch_url?`<a href="${f.pitch_url}" target="_blank" style="font-size:.72rem;color:var(--muted);text-decoration:none">📍 ${f.pitch_name}</a>`:`<span style="font-size:.72rem;color:var(--muted)">📍 ${f.pitch_name}</span>`):'';
       const homeCap=captains.find(c=>(c.team_name||c.name)===f.home_name);
       const awayCap=captains.find(c=>(c.team_name||c.name)===f.away_name);
-      const hLogo=homeCap&&homeCap.team_logo?'<img src="'+homeCap.team_logo+'" onclick="zoomLogo(this.src)" style="width:20px;height:20px;border-radius:3px;object-fit:cover;cursor:pointer"/>':'';
-      const aLogo=awayCap&&awayCap.team_logo?'<img src="'+awayCap.team_logo+'" onclick="zoomLogo(this.src)" style="width:20px;height:20px;border-radius:3px;object-fit:cover;cursor:pointer"/>':'';
-      const evHtml=f.events&&f.events.length?'<div style="width:100%;display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">'+f.events.map(ev=>'<div style="background:var(--pitch-mid);border:1px solid var(--border);border-radius:3px;padding:2px 7px;font-size:.74rem;display:flex;align-items:center;gap:4px">'+(ev.event_type==='goal'?'⚽':ev.event_type==='assist'?'🎯':'🧤')+' '+ev.player_name+'<button onclick="deleteFixtureEvent(''+f.id+'',''+ev.id+'')" style="background:none;border:none;color:var(--danger);cursor:pointer;padding:0">✕</button></div>').join('')+'</div>':'';
-      return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(45,92,62,.3);flex-wrap:wrap">'
-        +'<div style="min-width:80px;font-size:.72rem;color:var(--muted)">'+pitch+'</div>'
-        +'<span style="display:inline-flex;align-items:center;gap:5px;font-weight:700;flex:1;justify-content:flex-end">'+f.home_name+hLogo+'</span>'
-        +'<span style="font-family:Bebas Neue,sans-serif;font-size:1.3rem;min-width:50px;text-align:center">'+score+'</span>'
-        +'<span style="display:inline-flex;align-items:center;gap:5px;font-weight:700;flex:1">'+aLogo+f.away_name+'</span>'
-        +'<div style="display:flex;gap:5px;flex-shrink:0"><button class="btn btn-primary btn-sm" onclick="setResult(''+f.id+'')">Score</button><button class="btn btn-secondary btn-sm" onclick="openEventModal(''+f.id+'')">Events</button><button class="btn btn-danger btn-sm" onclick="deleteFixture(''+f.id+'')">✕</button></div>'
-        +evHtml+'</div>';
-    }).join(''):'<div style="font-size:.82rem;color:var(--muted);padding:6px 0">No fixtures in this gameweek.</div>';
-    const shuttleHtml=Object.keys(shuttleByRoute).length?Object.entries(shuttleByRoute).map(function([route,reqs]){
-      return '<div style="margin-bottom:6px"><div style="font-size:.76rem;color:var(--lime);margin-bottom:3px">'+route+' ('+reqs.length+')</div>'
-        +'<div style="display:flex;flex-wrap:wrap;gap:4px">'+reqs.map(r=>'<span style="background:var(--pitch-mid);border:1px solid var(--border);border-radius:3px;padding:2px 8px;font-size:.78rem;display:inline-flex;align-items:center;gap:5px">'+r.player_name+'<button onclick="deleteShuttleRequest(''+gw.id+'',''+r.id+'')" style="background:none;border:none;color:var(--danger);cursor:pointer;padding:0;font-size:.75rem">✕</button></span>').join('')+'</div></div>';
-    }).join(''):'<div style="font-size:.78rem;color:var(--muted)">No registrations.</div>';
-    return '<div class="card fade-in" style="margin-bottom:14px">'
-      +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'
-        +'<div style="font-family:Bebas Neue,sans-serif;font-size:1.2rem;letter-spacing:1.5px;color:var(--lime);flex:1">'+gwLabel+'</div>'
-        +'<button class="btn btn-danger btn-sm" onclick="deleteGameweek(''+gw.id+'')">Delete GW</button>'
-      +'</div>'
-      +fxHtml
-      +'<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'
-        +'<div style="font-size:.75rem;font-weight:700;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">🚌 Shuttle</div>'
-        +shuttleHtml
-      +'</div>'
-    +'</div>';
+      const hLogo=homeCap&&homeCap.team_logo?`<img src="${homeCap.team_logo}" onclick="zoomLogo(this.src)" style="width:20px;height:20px;border-radius:3px;object-fit:cover;cursor:pointer"/>`:'';
+      const aLogo=awayCap&&awayCap.team_logo?`<img src="${awayCap.team_logo}" onclick="zoomLogo(this.src)" style="width:20px;height:20px;border-radius:3px;object-fit:cover;cursor:pointer"/>`:'';
+      const evHtml=f.events&&f.events.length
+        ?`<div style="width:100%;display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${f.events.map(ev=>
+            `<div style="background:var(--pitch-mid);border:1px solid var(--border);border-radius:3px;padding:2px 7px;font-size:.74rem;display:flex;align-items:center;gap:4px">
+              ${ev.event_type==='goal'?'⚽':ev.event_type==='assist'?'🎯':'🧤'} ${ev.player_name}
+              <button data-fid="${f.id}" data-eid="${ev.id}" onclick="deleteFixtureEvent(this.dataset.fid,this.dataset.eid)" style="background:none;border:none;color:var(--danger);cursor:pointer;padding:0">✕</button>
+            </div>`).join('')}</div>` : '';
+      return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(45,92,62,.3);flex-wrap:wrap">
+        <div style="min-width:80px;font-size:.72rem;color:var(--muted)">${pitch}</div>
+        <span style="display:inline-flex;align-items:center;gap:5px;font-weight:700;flex:1;justify-content:flex-end">${f.home_name}${hLogo}</span>
+        <span style="font-family:'Bebas Neue',sans-serif;font-size:1.3rem;min-width:50px;text-align:center">${score}</span>
+        <span style="display:inline-flex;align-items:center;gap:5px;font-weight:700;flex:1">${aLogo}${f.away_name}</span>
+        <div style="display:flex;gap:5px;flex-shrink:0">
+          <button class="btn btn-primary btn-sm" data-fid="${f.id}" onclick="setResult(this.dataset.fid)">Score</button>
+          <button class="btn btn-secondary btn-sm" data-fid="${f.id}" onclick="openEventModal(this.dataset.fid)">Events</button>
+          <button class="btn btn-danger btn-sm" data-fid="${f.id}" onclick="deleteFixture(this.dataset.fid)">✕</button>
+        </div>
+        ${evHtml}
+      </div>`;
+    }).join('') : '<div style="font-size:.82rem;color:var(--muted);padding:6px 0">No fixtures in this gameweek.</div>';
+    const shuttleHtml=Object.keys(shuttleByRoute).length
+      ? Object.entries(shuttleByRoute).map(([route,reqs])=>
+          `<div style="margin-bottom:6px">
+            <div style="font-size:.76rem;color:var(--lime);margin-bottom:3px">${route} (${reqs.length})</div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px">${reqs.map(r=>
+              `<span style="background:var(--pitch-mid);border:1px solid var(--border);border-radius:3px;padding:2px 8px;font-size:.78rem;display:inline-flex;align-items:center;gap:5px">
+                ${r.player_name}
+                <button data-gwid="${gw.id}" data-rid="${r.id}" onclick="deleteShuttleRequest(this.dataset.gwid,this.dataset.rid)" style="background:none;border:none;color:var(--danger);cursor:pointer;padding:0;font-size:.75rem">✕</button>
+              </span>`).join('')}
+            </div>
+          </div>`).join('')
+      : '<div style="font-size:.78rem;color:var(--muted)">No registrations.</div>';
+    return `<div class="card fade-in" style="margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:1.5px;color:var(--lime);flex:1">${gwLabel}</div>
+        <button class="btn btn-danger btn-sm" data-gwid="${gw.id}" onclick="deleteGameweek(this.dataset.gwid)">Delete GW</button>
+      </div>
+      ${fxHtml}
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+        <div style="font-size:.75rem;font-weight:700;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">🚌 Shuttle</div>
+        ${shuttleHtml}
+      </div>
+    </div>`;
   }).join('');
 }
 

@@ -148,41 +148,50 @@
 
   <!-- FIXTURES -->
   <div class="tab-panel" id="tab-fixtures-tab">
-    <div class="grid-2">
-      <div class="card">
-        <div class="card-title">Add Gameweek</div>
-        <div class="form-group"><label>Match Date</label><input type="date" id="gw-date"/></div>
-        <div class="form-group"><label>Notes <span style="color:var(--muted);font-weight:normal">(optional)</span></label><input id="gw-notes" placeholder="e.g. Venue: Saraga"/></div>
-        <button class="btn btn-primary" onclick="addGameweek()">+ Add Gameweek</button>
-      </div>
-      <div class="card">
-        <div class="card-title">Add Fixture</div>
-        <div class="form-group"><label>Gameweek</label><select id="fixture-gw"></select></div>
-        <div class="form-group"><label>Home Team</label><select id="fixture-home"></select></div>
-        <div class="form-group"><label>Away Team</label><select id="fixture-away"></select></div>
-        <div class="form-group"><label>Pitch Name</label><input id="fixture-pitch-name" placeholder="e.g. Lapangan Saraga"/></div>
-        <div class="form-group"><label>Pitch URL <span style="color:var(--muted);font-weight:normal">(optional)</span></label><input id="fixture-pitch-url" placeholder="https://maps.google.com/…"/></div>
-        <button class="btn btn-primary" onclick="addFixture()">Add Fixture</button>
-      </div>
-    </div>
-    <div class="grid-2">
-      <div class="card">
-        <div class="card-title">Group Table</div>
+    <!-- Group table at top -->
+    <div class="grid-2" style="margin-bottom:16px">
+      <div class="card" style="padding:16px">
+        <div class="card-title" style="margin-bottom:10px">Group Table</div>
         <div id="standings-table"><div class="empty-state">No matches played.</div></div>
       </div>
-      <div class="card">
-        <div class="card-title">Player Stats</div>
+      <div class="card" style="padding:16px">
+        <div class="card-title" style="margin-bottom:10px">Player Stats</div>
         <div id="player-stats-table"><div class="empty-state">No stats.</div></div>
       </div>
     </div>
+
+    <!-- Compact add forms -->
+    <div class="grid-2" style="margin-bottom:16px">
+      <div class="card" style="padding:14px">
+        <div style="font-size:.72rem;font-weight:700;color:var(--lime);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">Add Gameweek</div>
+        <div style="display:flex;gap:8px;align-items:flex-end">
+          <div class="form-group" style="margin-bottom:0;flex:1"><label>Date</label><input type="date" id="gw-date"/></div>
+          <button class="btn btn-primary btn-sm" style="height:38px;flex-shrink:0;margin-bottom:0" onclick="addGameweek()">+ GW</button>
+        </div>
+      </div>
+      <div class="card" style="padding:14px">
+        <div style="font-size:.72rem;font-weight:700;color:var(--lime);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">Add Fixture</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div class="form-group" style="margin-bottom:0;min-width:90px;flex:1"><label>GW</label><select id="fixture-gw"></select></div>
+          <div class="form-group" style="margin-bottom:0;min-width:90px;flex:1"><label>Home</label><select id="fixture-home"></select></div>
+          <div class="form-group" style="margin-bottom:0;min-width:90px;flex:1"><label>Away</label><select id="fixture-away"></select></div>
+          <div class="form-group" style="margin-bottom:0;min-width:100px;flex:1"><label>Pitch</label><input id="fixture-pitch-name" placeholder="Saraga"/></div>
+          <div class="form-group" style="margin-bottom:0;min-width:100px;flex:1"><label>Pitch URL</label><input id="fixture-pitch-url" placeholder="https://…"/></div>
+          <button class="btn btn-primary btn-sm" style="height:38px;flex-shrink:0" onclick="addFixture()">+ Fixture</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gameweeks list -->
     <div id="fixtures-list"><div class="empty-state">No gameweeks yet.</div></div>
 
-    <div class="card" style="margin-top:16px">
-      <div class="card-title">Shuttle Routes</div>
+    <!-- Shuttle routes -->
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:14px;margin-top:12px">
+      <div style="font-size:.72rem;font-weight:700;color:var(--lime);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Shuttle Routes</div>
       <div id="shuttle-routes-list"></div>
-      <div class="inline-row" style="margin-top:10px">
-        <div class="form-group" style="margin-bottom:0"><label>New Route</label><input id="new-route-label" placeholder="e.g. Cimahi → Jakarta"/></div>
-        <button class="btn btn-secondary btn-sm" onclick="addShuttleRoute()">Add</button>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <input id="new-route-label" placeholder="e.g. Cimahi → Jakarta" style="flex:1;padding:6px 10px;font-size:.82rem"/>
+        <button class="btn btn-secondary btn-sm" onclick="addShuttleRoute()">Add Route</button>
       </div>
     </div>
   </div>
