@@ -120,7 +120,7 @@ function teamsInnerHTML(){
     const displayName=cap.team_name||cap.name;
     const logoEl=cap.team_logo?`<img src="${cap.team_logo}" onclick="zoomLogo('${cap.team_logo}')" style="width:32px;height:32px;border-radius:4px;object-fit:cover;cursor:pointer;flex-shrink:0"/>`:'';
     return `<div class="team-card"><div class="team-card-header"><span style="display:inline-flex;align-items:center;gap:8px">${logoEl}${displayName}</span><span class="mono" style="font-size:.82rem;color:var(--muted);font-weight:normal">${mine.length}</span></div>
-      ${mine.length?mine.map(p=>`<div class="team-player-row"><span style="font-weight:600">${p.name}</span>
+      ${mine.length?mine.map(p=>`<div class="team-player-row"><span style="display:inline-flex;align-items:center;gap:5px;font-weight:600"><span>${p.name}</span>${p.name===cap.name?'<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--gold);color:var(--pitch);font-size:.6rem;font-weight:900;flex-shrink:0" title="Captain">C</span>':''}</span>
         <div style="display:flex;align-items:center;gap:6px"><span class="pos-badge ${posClass(p.position)}">${p.position||'?'}</span><span class="year-tag">${p.batch_year}</span></div>
       </div>`).join(''):'<div style="padding:12px 16px;font-size:.82rem;color:var(--muted)">No players yet</div>'}
     </div>`;

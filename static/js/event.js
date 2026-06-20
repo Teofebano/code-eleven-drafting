@@ -276,7 +276,7 @@ function renderLiveTeams(){
   el.innerHTML='<div class="teams-grid">'+captains.map(c=>{
     const mine=pls.filter(p=>p.taken_by===c.id);
     return `<div class="team-col"><div class="team-header">${teamDisplay(c)}<span class="mono" style="font-size:.8rem;color:var(--muted);font-weight:normal">${mine.length}</span></div>
-      ${mine.length?mine.map(p=>`<div class="team-player"><span>${p.name}</span><span class="tag-pos">${p.position}</span></div>`).join(''):'<div style="font-size:.8rem;color:var(--muted);padding:6px 0">No picks</div>'}
+      ${mine.length?mine.map(p=>`<div class="team-player"><span style="display:inline-flex;align-items:center;gap:5px"><span>${p.name}</span>${p.name===c.name?`<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--gold);color:var(--pitch);font-size:.6rem;font-weight:900;flex-shrink:0" title="Captain">C</span>`:''}</span><span class="tag-pos">${p.position}</span></div>`).join(''):'<div style="font-size:.8rem;color:var(--muted);padding:6px 0">No picks</div>'}
     </div>`;
   }).join('')+'</div>';
 }
@@ -286,7 +286,7 @@ function renderPickHistory(hist){
   if(!hist.length){el.innerHTML='<div class="empty-state">No picks.</div>';return;}
   const gl={g1:'≤2004',g2:'2005-2018',g3:'>2018'};
   el.innerHTML=`<table><thead><tr><th>#</th><th>Captain</th><th>Player</th><th>Pos</th><th>Year</th><th>Group</th></tr></thead>
-    <tbody>${hist.map(h=>`<tr><td class="mono">${h.pick_number}</td><td><strong>${h.captain_name}</strong></td>
+    <tbody>${hist.map(h=>`<tr><td class="mono">${h.pick_number}</td><td><span style="display:inline-flex;align-items:center;gap:5px"><strong>${h.captain_name}</strong><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--gold);color:var(--pitch);font-size:.6rem;font-weight:900;flex-shrink:0" title="Captain">C</span></span></td>
       <td>${h.player_name}</td><td><span class="tag-pos">${h.player_position}</span></td>
       <td class="mono">${h.player_year}</td><td><span class="badge ${GROUP_BADGE[h.group_id]}">${gl[h.group_id]||h.group_id}</span></td>
     </tr>`).join('')}</tbody></table>`;
@@ -467,7 +467,7 @@ function renderTeamsManagement(){
         </tr></thead>
         <tbody>
           ${mine.map(p=>`<tr>
-            <td style="padding:7px 10px"><strong>${p.name}</strong></td>
+            <td style="padding:7px 10px"><span style="display:inline-flex;align-items:center;gap:5px"><strong>${p.name}</strong>${p.name===c.name?`<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--gold);color:var(--pitch);font-size:.6rem;font-weight:900;flex-shrink:0" title="Captain">C</span>`:''}</span></td>
             <td style="padding:7px 10px"><span class="tag-pos">${p.position}</span></td>
             <td style="padding:7px 10px;font-family:'JetBrains Mono',monospace;font-size:.82rem">${p.batch_year||'—'}</td>
             <td style="padding:7px 10px">

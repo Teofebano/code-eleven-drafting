@@ -172,7 +172,7 @@ function teamsInnerHTML(){
     const dn=c.team_name||c.name;
     const logo=c.team_logo?`<img src="${c.team_logo}" onclick="zoomLogo('${c.team_logo}')" style="width:24px;height:24px;border-radius:3px;object-fit:cover;cursor:pointer;flex-shrink:0"/>`:""
     return '<div class="team-col"><div class="team-header"><span style="display:inline-flex;align-items:center;gap:6px">'+logo+dn+'</span><span class="mono" style="font-size:.78rem;color:var(--muted);font-weight:normal">'+mine.length+'</span></div>'
-      +(mine.length?mine.map(p=>'<div class="team-player"><span>'+p.name+'</span><div style="display:flex;gap:5px;align-items:center"><span class="pos-badge '+posClass(p.position)+'">'+(p.position||'?')+'</span><span class="year-tag">'+p.batch_year+'</span></div></div>').join('')
+      +(mine.length?mine.map(p=>'<div class="team-player"><span style="display:inline-flex;align-items:center;gap:5px">''<span>'+p.name+'</span>'+(p.name===c.name?'<span style=\"display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--gold);color:var(--pitch);font-size:.6rem;font-weight:900;flex-shrink:0\" title=\"Captain\">C</span>':'')+'</span><div style="display:flex;gap:5px;align-items:center"><span class="pos-badge '+posClass(p.position)+'">'+(p.position||'?')+'</span><span class="year-tag">'+p.batch_year+'</span></div></div>').join('')
         :'<div style="font-size:.8rem;color:var(--muted);padding:6px 0">No picks</div>')+'</div>';
   }).join('')+'</div>';
 }
