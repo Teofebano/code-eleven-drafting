@@ -150,21 +150,41 @@
   <div class="tab-panel" id="tab-fixtures-tab">
     <div class="grid-2">
       <div class="card">
+        <div class="card-title">Add Gameweek</div>
+        <div class="form-group"><label>Match Date</label><input type="date" id="gw-date"/></div>
+        <div class="form-group"><label>Notes <span style="color:var(--muted);font-weight:normal">(optional)</span></label><input id="gw-notes" placeholder="e.g. Venue: Saraga"/></div>
+        <button class="btn btn-primary" onclick="addGameweek()">+ Add Gameweek</button>
+      </div>
+      <div class="card">
         <div class="card-title">Add Fixture</div>
+        <div class="form-group"><label>Gameweek</label><select id="fixture-gw"></select></div>
         <div class="form-group"><label>Home Team</label><select id="fixture-home"></select></div>
         <div class="form-group"><label>Away Team</label><select id="fixture-away"></select></div>
-        <div class="form-group"><label>Match Date</label><input type="date" id="fixture-date"/></div>
         <div class="form-group"><label>Pitch Name</label><input id="fixture-pitch-name" placeholder="e.g. Lapangan Saraga"/></div>
-        <div class="form-group"><label>Pitch URL <span style="color:var(--muted);font-weight:normal">(Google Maps link, optional)</span></label><input id="fixture-pitch-url" placeholder="https://maps.google.com/…"/></div>
+        <div class="form-group"><label>Pitch URL <span style="color:var(--muted);font-weight:normal">(optional)</span></label><input id="fixture-pitch-url" placeholder="https://maps.google.com/…"/></div>
         <button class="btn btn-primary" onclick="addFixture()">Add Fixture</button>
       </div>
+    </div>
+    <div class="grid-2">
       <div class="card">
         <div class="card-title">Group Table</div>
         <div id="standings-table"><div class="empty-state">No matches played.</div></div>
       </div>
+      <div class="card">
+        <div class="card-title">Player Stats</div>
+        <div id="player-stats-table"><div class="empty-state">No stats.</div></div>
+      </div>
     </div>
-    <div class="card"><div class="card-title">Fixtures</div><div id="fixtures-list"><div class="empty-state">No fixtures.</div></div></div>
-    <div class="card"><div class="card-title">Player Stats</div><div id="player-stats-table"><div class="empty-state">No stats.</div></div></div>
+    <div id="fixtures-list"><div class="empty-state">No gameweeks yet.</div></div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card-title">Shuttle Routes</div>
+      <div id="shuttle-routes-list"></div>
+      <div class="inline-row" style="margin-top:10px">
+        <div class="form-group" style="margin-bottom:0"><label>New Route</label><input id="new-route-label" placeholder="e.g. Cimahi → Jakarta"/></div>
+        <button class="btn btn-secondary btn-sm" onclick="addShuttleRoute()">Add</button>
+      </div>
+    </div>
   </div>
 
   <!-- TEAMS MANAGEMENT -->

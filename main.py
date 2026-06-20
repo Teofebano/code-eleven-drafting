@@ -106,9 +106,33 @@ def init_db():
         captain_id TEXT NOT NULL, chosen_index INTEGER,
         is_correct INTEGER NOT NULL, answered_at_ms INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS gameweeks (
+        id TEXT PRIMARY KEY,
+        event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+        number INTEGER NOT NULL,
+        match_date TEXT DEFAULT NULL,
+        notes TEXT DEFAULT '',
+        created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS shuttle_routes (
+        id TEXT PRIMARY KEY,
+        event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+        label TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS shuttle_requests (
+        id TEXT PRIMARY KEY,
+        gameweek_id TEXT NOT NULL REFERENCES gameweeks(id) ON DELETE CASCADE,
+        event_id TEXT NOT NULL,
+        player_name TEXT NOT NULL,
+        route_id TEXT REFERENCES shuttle_routes(id) ON DELETE SET NULL,
+        route_label TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now'))
+    );
     CREATE TABLE IF NOT EXISTS fixtures (
         id TEXT PRIMARY KEY,
         event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+        gameweek_id TEXT REFERENCES gameweeks(id) ON DELETE SET NULL,
         home_captain_id TEXT NOT NULL REFERENCES captains(id),
         away_captain_id TEXT NOT NULL REFERENCES captains(id),
         match_date TEXT DEFAULT NULL,
@@ -138,6 +162,44 @@ def init_db():
             c.execute("ALTER TABLE captains ADD COLUMN team_logo TEXT DEFAULT NULL")
     except Exception as e:
         print(f"captains column migration note: {e}")
+
+    # Add gameweek_id to fixtures if missing
+    try:
+        fx_cols2 = [r[1] for r in c.execute("PRAGMA table_info(fixtures)").fetchall()]
+        if fx_cols2 and "gameweek_id" not in fx_cols2:
+            c.execute("ALTER TABLE fixtures ADD COLUMN gameweek_id TEXT DEFAULT NULL")
+    except Exception as e:
+        print(f"gameweek_id migration note: {e}")
+
+    # Migrate existing fixtures into GW1 per event
+    try:
+        events_with_fixtures = c.execute("""
+            SELECT DISTINCT event_id FROM fixtures WHERE gameweek_id IS NULL
+        """).fetchall()
+        for ev in events_with_fixtures:
+            eid = ev["event_id"]
+            existing_gw = c.execute("SELECT id FROM gameweeks WHERE event_id=? AND number=1", (eid,)).fetchone()
+            if not existing_gw:
+                gwid = str(__import__('uuid').uuid4())
+                c.execute("INSERT INTO gameweeks(id,event_id,number,notes) VALUES(?,?,?,?)",
+                          (gwid, eid, 1, "Migrated fixtures"))
+                c.execute("UPDATE fixtures SET gameweek_id=? WHERE event_id=? AND gameweek_id IS NULL", (gwid, eid))
+            else:
+                c.execute("UPDATE fixtures SET gameweek_id=? WHERE event_id=? AND gameweek_id IS NULL", (existing_gw["id"], eid))
+    except Exception as e:
+        print(f"GW migration note: {e}")
+
+    # Seed default shuttle routes per event
+    try:
+        events_list = c.execute("SELECT id FROM events").fetchall()
+        for ev in events_list:
+            existing = c.execute("SELECT id FROM shuttle_routes WHERE event_id=?", (ev["id"],)).fetchone()
+            if not existing:
+                for label in ["Bandung → Jakarta", "Jakarta → Bandung"]:
+                    c.execute("INSERT INTO shuttle_routes(id,event_id,label) VALUES(?,?,?)",
+                              (str(__import__('uuid').uuid4()), ev["id"], label))
+    except Exception as e:
+        print(f"Shuttle routes seed note: {e}")
 
     # Add pitch columns to fixtures if missing
     try:
@@ -1035,22 +1097,31 @@ async def get_results(eid: str, token: str = Cookie(default=None)):
 
 @app.get("/api/events/{eid}/standings-full")
 async def get_standings_full(eid: str, token: str = Cookie(default=None)):
-    """Standings + fixtures for the results page (viewer-accessible)."""
+    """Standings + gameweeks + fixtures + shuttle for the results page."""
     if not token: raise HTTPException(401,"Not authenticated")
     d=decode_token(token)
     if not d or d.get("role") not in ("viewer","captain","admin"): raise HTTPException(403,"Login required")
     conn=get_db()
-    caps={c["id"]:(c["team_name"] or c["name"]) for c in conn.execute("SELECT id,name,team_name FROM captains WHERE event_id=?",(eid,)).fetchall()}
-    fixtures_raw=conn.execute("""SELECT f.*,COALESCE(ch.team_name,ch.name) as home_name,COALESCE(ca.team_name,ca.name) as away_name
-        FROM fixtures f JOIN captains ch ON f.home_captain_id=ch.id JOIN captains ca ON f.away_captain_id=ca.id
-        WHERE f.event_id=? ORDER BY f.match_date,f.created_at""",(eid,)).fetchall()
-    fixtures=[dict(r) for r in fixtures_raw]
+    caps={c["id"]:dict(c) for c in conn.execute("SELECT id,name,team_name,team_logo FROM captains WHERE event_id=?",(eid,)).fetchall()}
+    # build gameweeks with fixtures + shuttle
+    gws_raw = conn.execute("SELECT * FROM gameweeks WHERE event_id=? ORDER BY number",(eid,)).fetchall()
+    gameweeks = []
+    for gw in gws_raw:
+        fx_raw = conn.execute("""SELECT f.*,COALESCE(ch.team_name,ch.name) as home_name,COALESCE(ca.team_name,ca.name) as away_name
+            FROM fixtures f JOIN captains ch ON f.home_captain_id=ch.id JOIN captains ca ON f.away_captain_id=ca.id
+            WHERE f.gameweek_id=? ORDER BY f.created_at""",(gw["id"],)).fetchall()
+        shuttle = conn.execute("SELECT * FROM shuttle_requests WHERE gameweek_id=? ORDER BY created_at",(gw["id"],)).fetchall()
+        routes  = conn.execute("SELECT * FROM shuttle_routes WHERE event_id=? ORDER BY created_at",(eid,)).fetchall()
+        gameweeks.append({**dict(gw), "fixtures":[dict(f) for f in fx_raw],
+                          "shuttle":[dict(s) for s in shuttle], "routes":[dict(r) for r in routes]})
+    # standalone fixtures for standings calc
     played=conn.execute("SELECT * FROM fixtures WHERE event_id=? AND status='played'",(eid,)).fetchall()
-    stats={cid:{"name":name,"p":0,"w":0,"d":0,"l":0,"gf":0,"ga":0,"pts":0} for cid,name in caps.items()}
+    cap_names={cid:(c["team_name"] or c["name"]) for cid,c in caps.items()}
+    stats={cid:{"name":name,"p":0,"w":0,"d":0,"l":0,"gf":0,"ga":0,"pts":0} for cid,name in cap_names.items()}
     for f in played:
         h,a=f["home_captain_id"],f["away_captain_id"]; hs,as_=f["home_score"] or 0,f["away_score"] or 0
         for x in [h,a]:
-            if x not in stats: stats[x]={"name":caps.get(x,x),"p":0,"w":0,"d":0,"l":0,"gf":0,"ga":0,"pts":0}
+            if x not in stats: stats[x]={"name":cap_names.get(x,x),"p":0,"w":0,"d":0,"l":0,"gf":0,"ga":0,"pts":0}
         stats[h]["p"]+=1;stats[h]["gf"]+=hs;stats[h]["ga"]+=as_
         stats[a]["p"]+=1;stats[a]["gf"]+=as_;stats[a]["ga"]+=hs
         if hs>as_: stats[h]["w"]+=1;stats[h]["pts"]+=3;stats[a]["l"]+=1
@@ -1067,7 +1138,7 @@ async def get_standings_full(eid: str, token: str = Cookie(default=None)):
         elif e["event_type"]=="assist": pstats[pid]["assists"]+=1
         elif e["event_type"]=="cleansheet": pstats[pid]["cleansheets"]+=1
     conn.close()
-    return {"table":table,"fixtures":fixtures,
+    return {"table":table,"gameweeks":gameweeks,
             "player_stats":sorted(pstats.values(),key=lambda p:(-p["goals"],-p["assists"],-p["cleansheets"],p["name"]))}
 
 # ── EXPORT / RESTORE ──────────────────────────────────────────────────────

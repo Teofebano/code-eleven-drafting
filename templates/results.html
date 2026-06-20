@@ -50,11 +50,11 @@ const eid=location.pathname.split('/results/')[1];
 async function init(){
   const me=await fetch('/api/auth/me').then(r=>r.json());
   if(!me.role||!['viewer','captain','admin'].includes(me.role)){window.location.href='/';return;}
-  await loadResults();
+  await loadResultsData();
   connectWS();
 }
 
-async function loadResults(){
+async function loadResultsData(){
   const res=await fetch(`/api/events/${eid}/results`);
   if(!res.ok){window.location.href='/';return;}
   data=await res.json();
@@ -68,7 +68,7 @@ function connectWS(){
   ws=new WebSocket(`${proto}://${location.host}/ws/draft?room=event:${eid}`);
   ws.onmessage=e=>{
     const msg=JSON.parse(e.data);
-    if(['player_picked','players_updated','phase_change','reset','fixtures_updated'].includes(msg.type)) loadResults();
+    if(['player_picked','players_updated','phase_change','reset','fixtures_updated','shuttle_updated'].includes(msg.type)) loadResultsData();
   };
   ws.onclose=()=>setTimeout(connectWS,2000);
   setInterval(()=>{if(ws&&ws.readyState===1)ws.send('ping');},20000);
@@ -102,14 +102,21 @@ function render(){
   // order: table → fixtures → player stats → squad list
   let html='';
   if(standings?.table?.length) html+=standingsHTML();
-  if(standings?.fixtures?.length) html+=fixturesHTML();
+  if(standings?.gameweeks?.length) html+=fixturesHTML();
 
   const sortBar=`<div class="sort-bar"><span style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Sort:</span>`
     +['year','position','name'].map(s=>`<button class="sort-btn ${currentSort===s?'active':''}" data-sort="${s}" onclick="setSort('${s}')">${s==='year'?'Batch Year':s==='position'?'Position':'Name'}</button>`).join('')
     +'</div>';
-  html+=`<div class="section-title">Squad List</div>${sortBar}<div class="teams-grid" id="teams-wrap">${teamsInnerHTML()}</div>`;
+  // Squad list - collapsible
+  html+='<details style="margin-bottom:8px"><summary style="background:var(--card);border:1px solid var(--border);border-radius:5px;padding:12px 16px;font-family:Bebas Neue,sans-serif;font-size:1.2rem;letter-spacing:1.5px;cursor:pointer;list-style:none;display:flex;align-items:center">Squad List <span style="margin-left:auto;font-size:.8rem;font-family:Inter,sans-serif;font-weight:600;color:var(--lime)">▼ Show</span></summary>';
+  html+='<div style="margin-top:4px">'+sortBar+'<div class="teams-grid" id="teams-wrap">'+teamsInnerHTML()+'</div></div>';
+  html+='</details>';
   const ud=data.players.filter(p=>!p.taken_by);
-  if(ud.length) html+=`<div class="section-title" style="color:var(--muted)">Undrafted (${ud.length})</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px" id="undrafted-wrap">${undraftedInnerHTML()}</div>`;
+  if(ud.length){
+    html+='<details><summary style="background:var(--card);border:1px solid var(--border);border-radius:5px;padding:10px 16px;font-size:.82rem;font-weight:700;color:var(--muted);cursor:pointer;list-style:none;display:flex;align-items:center">Undrafted ('+ud.length+') <span style="margin-left:auto;font-size:.7rem">▼</span></summary>';
+    html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin-top:4px" id="undrafted-wrap">'+undraftedInnerHTML()+'</div>';
+    html+='</details>';
+  }
   document.getElementById('content').innerHTML=html;
 }
 
@@ -192,31 +199,96 @@ function standingsHTML(){
 }
 
 function fixturesHTML(){
-  var fx=standings.fixtures||[];
-  if(!fx.length) return '';
-  var capMap={};(data.captains||[]).forEach(function(c){capMap[c.id]=c;});
-  var h='<div class="section-title">Fixtures</div><div style="display:flex;flex-direction:column;gap:8px;margin-bottom:24px">';
-  fx.forEach(function(f){
-    var played=f.status==='played';
-    var score=played?('<strong style="color:var(--lime)">'+f.home_score+' &ndash; '+f.away_score+'</strong>'):'<span style="color:var(--muted)">vs</span>';
-    var pitch=f.pitch_name?(f.pitch_url?('<a href="'+f.pitch_url+'" target="_blank" style="font-size:.72rem;color:var(--muted);text-decoration:none">&#128205; '+f.pitch_name+'</a>'):'<span style="font-size:.72rem;color:var(--muted)">&#128205; '+f.pitch_name+'</span>'):'';
-    var homeCap=capMap[f.home_captain_id]; var awayCap=capMap[f.away_captain_id];
-    var homeName=f.home_name||(homeCap&&(homeCap.team_name||homeCap.name))||'?';
-    var awayName=f.away_name||(awayCap&&(awayCap.team_name||awayCap.name))||'?';
-    var homeLogo=homeCap?logoImg(homeCap.team_logo,24):'';
-    var awayLogo=awayCap?logoImg(awayCap.team_logo,24):'';
-    h+='<div style="background:var(--card);border:1px solid var(--border);border-radius:5px;padding:14px 16px;">'
-      +'<div style="font-size:.75rem;color:var(--muted);margin-bottom:10px">'+(f.match_date||'TBD')+(pitch?' &nbsp; '+pitch:'')+'</div>'
-      +'<div style="display:flex;align-items:center;gap:8px;">'
-        +'<span style="display:inline-flex;align-items:center;gap:6px;font-weight:700;flex:1;justify-content:flex-end;text-align:right">'+homeName+homeLogo+'</span>'
-        +'<span style="font-family:Bebas Neue,sans-serif;font-size:1.4rem;min-width:56px;text-align:center;flex-shrink:0">'+score+'</span>'
-        +'<span style="display:inline-flex;align-items:center;gap:6px;font-weight:700;flex:1">'+awayLogo+awayName+'</span>'
-      +'</div>'
-    +'</div>';
+  var gws=standings.gameweeks||[];
+  if(!gws.length) return '';
+  var h='<div class="section-title">Fixtures</div>';
+  gws.forEach(function(gw){
+    var gwLabel='GW'+gw.number+(gw.match_date?' · '+gw.match_date:'')+(gw.notes?' · '+gw.notes:'');
+    h+='<div style="background:var(--card);border:1px solid var(--border);border-radius:6px;margin-bottom:12px;overflow:hidden">';
+    h+='<div style="padding:12px 16px;background:var(--pitch-light);font-family:Bebas Neue,sans-serif;font-size:1.1rem;letter-spacing:1.5px;color:var(--lime)">'+gwLabel+'</div>';
+    // fixtures
+    if(gw.fixtures&&gw.fixtures.length){
+      gw.fixtures.forEach(function(f){
+        var played=f.status==='played';
+        var score=played?('<strong style="color:var(--lime)">'+f.home_score+' &ndash; '+f.away_score+'</strong>'):'<span style="color:var(--muted)">vs</span>';
+        var pitch=f.pitch_name?(f.pitch_url?('<a href="'+f.pitch_url+'" target="_blank" style="font-size:.72rem;color:var(--muted);text-decoration:none">&#128205; '+f.pitch_name+'</a>'):'<span style="font-size:.72rem;color:var(--muted)">&#128205; '+f.pitch_name+'</span>'):'';
+        var homeCap=window._capById&&Object.values(window._capById).find(function(c){return (c.team_name||c.name)===f.home_name;});
+        var awayCap=window._capById&&Object.values(window._capById).find(function(c){return (c.team_name||c.name)===f.away_name;});
+        var hLogo=homeCap?logoImg(homeCap.team_logo,22):'';
+        var aLogo=awayCap?logoImg(awayCap.team_logo,22):'';
+        h+='<div style="padding:10px 16px;border-bottom:1px solid rgba(45,92,62,.25)">';
+        if(pitch) h+='<div style="margin-bottom:6px">'+pitch+'</div>';
+        h+='<div style="display:flex;align-items:center;gap:8px">'
+          +'<span style="display:inline-flex;align-items:center;gap:6px;font-weight:700;flex:1;justify-content:flex-end">'+f.home_name+hLogo+'</span>'
+          +'<span style="font-family:Bebas Neue,sans-serif;font-size:1.3rem;min-width:54px;text-align:center">'+score+'</span>'
+          +'<span style="display:inline-flex;align-items:center;gap:6px;font-weight:700;flex:1">'+aLogo+f.away_name+'</span>'
+          +'</div></div>';
+      });
+    } else {
+      h+='<div style="padding:10px 16px;font-size:.82rem;color:var(--muted)">No fixtures scheduled.</div>';
+    }
+    // shuttle toggle
+    h+=shuttleSection(gw);
+    h+='</div>';
   });
-  h+='</div>';
   return h;
 }
+
+function shuttleSection(gw){
+  var id='shuttle-'+gw.id;
+  var routes=gw.routes||[];
+  var reqs=gw.shuttle||[];
+  // group by route
+  var byRoute={};
+  reqs.forEach(function(r){ if(!byRoute[r.route_label]) byRoute[r.route_label]=[]; byRoute[r.route_label].push(r.player_name); });
+  var total=reqs.length;
+  var listHtml='';
+  if(Object.keys(byRoute).length){
+    listHtml=Object.entries(byRoute).map(function(e){
+      return '<div style="margin-bottom:8px"><div style="font-size:.76rem;color:var(--lime);margin-bottom:3px">'+e[0]+' ('+e[1].length+')</div>'
+        +'<div style="display:flex;flex-wrap:wrap;gap:4px">'+e[1].map(function(n){
+          return '<span style="background:var(--pitch-mid);border:1px solid var(--border);border-radius:12px;padding:3px 10px;font-size:.78rem">'+n+'</span>';
+        }).join('')+'</div></div>';
+    }).join('');
+  } else {
+    listHtml='<div style="font-size:.8rem;color:var(--muted);margin-bottom:10px">No registrations yet.</div>';
+  }
+  var routeOpts=routes.map(function(r){return '<option value="'+r.id+'|'+r.label+'">'+r.label+'</option>';}).join('');
+  var shuttleBtn='<details><summary style="border-top:1px solid var(--border);padding:10px 16px;cursor:pointer;list-style:none;display:flex;align-items:center;font-size:.82rem;font-weight:700;color:var(--muted);background:none">'
+    +'<span>&#x1F68C; Shuttle</span>'+(total?'<span style="color:var(--lime);font-family:Bebas Neue,sans-serif;font-size:.9rem;margin-left:6px">'+total+' registered</span>':'')
+    +'<span style="margin-left:auto;font-size:.7rem">&#9660;</span></summary>'
+    +'<div style="padding:0 16px 14px">'
+      +listHtml
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-top:8px">'
+        +'<input id="'+id+'-name" placeholder="Your name" style="flex:1;min-width:120px;padding:7px 10px;font-size:.85rem"/>'
+        +'<select id="'+id+'-route" style="flex:1;min-width:140px;padding:7px 10px;font-size:.85rem">'+routeOpts+'</select>'
+        +'<button class="btn btn-primary btn-sm" data-gwid="'+gw.id+'" data-sid="'+id+'" onclick="registerShuttle(this.dataset.gwid,this.dataset.sid)">Register / Toggle</button>'
+      +'</div>'
+    +'</div></details>';
+  return shuttleBtn;
+}
+
+
+
+async function registerShuttle(gwid, id){
+  var name=document.getElementById(id+'-name').value.trim();
+  var routeVal=document.getElementById(id+'-route').value;
+  if(!name){alert('Enter your name');return;}
+  if(!routeVal){alert('Select a route');return;}
+  var parts=routeVal.split('|');
+  var routeId=parts[0], routeLabel=parts.slice(1).join('|');
+  var res=await fetch('/api/events/'+currentEid+'/shuttle/'+gwid,{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({player_name:name,route_id:routeId,route_label:routeLabel})
+  });
+  var data=await res.json();
+  if(res.ok){
+    var msg=data.action==='added'?'Registered for shuttle!':'Removed from shuttle.';
+    alert(msg);
+    loadResultsData();
+  } else {alert('Error: '+(data.detail||'Unknown'));}
+}
+
 
 function zoomLogo(url){
   const o=document.createElement('div');
