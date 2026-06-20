@@ -160,25 +160,25 @@
       </div>
     </div>
 
-    <!-- Compact add forms -->
-    <div class="grid-2" style="margin-bottom:16px">
-      <div class="card" style="padding:14px">
+    <!-- Add forms -->
+    <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap">
+      <!-- Add Gameweek - small -->
+      <div class="card" style="padding:14px;flex-shrink:0;width:220px">
         <div style="font-size:.72rem;font-weight:700;color:var(--lime);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">Add Gameweek</div>
-        <div style="display:flex;gap:8px;align-items:flex-end">
-          <div class="form-group" style="margin-bottom:0;flex:1"><label>Date</label><input type="date" id="gw-date"/></div>
-          <button class="btn btn-primary btn-sm" style="height:38px;flex-shrink:0;margin-bottom:0" onclick="addGameweek()">+ GW</button>
-        </div>
+        <div class="form-group"><label>Date</label><input type="date" id="gw-date"/></div>
+        <button class="btn btn-primary btn-sm" style="width:100%" onclick="addGameweek()">+ Add GW</button>
       </div>
-      <div class="card" style="padding:14px">
+      <!-- Add Fixture - takes remaining space -->
+      <div class="card" style="padding:14px;flex:1;min-width:400px">
         <div style="font-size:.72rem;font-weight:700;color:var(--lime);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">Add Fixture</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-          <div class="form-group" style="margin-bottom:0;min-width:90px;flex:1"><label>GW</label><select id="fixture-gw"></select></div>
-          <div class="form-group" style="margin-bottom:0;min-width:90px;flex:1"><label>Home</label><select id="fixture-home"></select></div>
-          <div class="form-group" style="margin-bottom:0;min-width:90px;flex:1"><label>Away</label><select id="fixture-away"></select></div>
-          <div class="form-group" style="margin-bottom:0;min-width:100px;flex:1"><label>Pitch</label><input id="fixture-pitch-name" placeholder="Saraga"/></div>
-          <div class="form-group" style="margin-bottom:0;min-width:100px;flex:1"><label>Pitch URL</label><input id="fixture-pitch-url" placeholder="https://…"/></div>
-          <button class="btn btn-primary btn-sm" style="height:38px;flex-shrink:0" onclick="addFixture()">+ Fixture</button>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+          <div class="form-group" style="margin-bottom:0"><label>Gameweek</label><select id="fixture-gw"></select></div>
+          <div class="form-group" style="margin-bottom:0"><label>Home Team</label><select id="fixture-home"></select></div>
+          <div class="form-group" style="margin-bottom:0"><label>Away Team</label><select id="fixture-away"></select></div>
+          <div class="form-group" style="margin-bottom:0"><label>Pitch Name</label><input id="fixture-pitch-name" placeholder="e.g. Lapangan Saraga"/></div>
+          <div class="form-group" style="margin-bottom:0;grid-column:span 2"><label>Pitch URL</label><input id="fixture-pitch-url" placeholder="https://maps.google.com/…"/></div>
         </div>
+        <button class="btn btn-primary btn-sm" onclick="addFixture()">+ Add Fixture</button>
       </div>
     </div>
 

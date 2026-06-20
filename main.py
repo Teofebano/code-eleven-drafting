@@ -993,6 +993,139 @@ async def pick_player(eid: str, body: dict, auth=Depends(require_captain)):
         "captain_id":captain_id,"pick_number":pick_num,"next_picker_index":(pidx+1)%len(order)})
     return {"ok":True}
 
+# ── GAMEWEEKS ────────────────────────────────────────────────────────────
+@app.get("/api/events/{eid}/gameweeks")
+async def list_gameweeks(eid: str, token: str = Cookie(default=None)):
+    conn = get_db()
+    gws = conn.execute("SELECT * FROM gameweeks WHERE event_id=? ORDER BY number", (eid,)).fetchall()
+    result = []
+    for gw in gws:
+        fixtures = conn.execute("""
+            SELECT f.*, COALESCE(ch.team_name,ch.name) as home_name, COALESCE(ca.team_name,ca.name) as away_name
+            FROM fixtures f
+            JOIN captains ch ON f.home_captain_id=ch.id
+            JOIN captains ca ON f.away_captain_id=ca.id
+            WHERE f.gameweek_id=? ORDER BY f.created_at
+        """, (gw["id"],)).fetchall()
+        fix_list = []
+        for f in fixtures:
+            fx = dict(f)
+            fx["events"] = [dict(e) for e in conn.execute(
+                "SELECT * FROM fixture_events WHERE fixture_id=?", (f["id"],)).fetchall()]
+            fix_list.append(fx)
+        shuttle = conn.execute(
+            "SELECT * FROM shuttle_requests WHERE gameweek_id=? ORDER BY created_at", (gw["id"],)).fetchall()
+        routes = conn.execute(
+            "SELECT * FROM shuttle_routes WHERE event_id=? ORDER BY created_at", (eid,)).fetchall()
+        result.append({**dict(gw), "fixtures": fix_list,
+                       "shuttle": [dict(s) for s in shuttle],
+                       "routes": [dict(r) for r in routes]})
+    conn.close()
+    return result
+
+@app.post("/api/events/{eid}/gameweeks")
+async def create_gameweek(eid: str, match_date: str = Form(default=""),
+                           notes: str = Form(default=""), auth=Depends(require_admin)):
+    conn = get_db()
+    num = (conn.execute("SELECT MAX(number) as m FROM gameweeks WHERE event_id=?", (eid,)).fetchone()["m"] or 0) + 1
+    gwid = str(uuid.uuid4())
+    conn.execute("INSERT INTO gameweeks(id,event_id,number,match_date,notes) VALUES(?,?,?,?,?)",
+                 (gwid, eid, num, match_date or None, notes.strip()))
+    existing = conn.execute("SELECT id FROM shuttle_routes WHERE event_id=?", (eid,)).fetchone()
+    if not existing:
+        for label in ["Bandung → Jakarta", "Jakarta → Bandung"]:
+            conn.execute("INSERT INTO shuttle_routes(id,event_id,label) VALUES(?,?,?)",
+                         (str(uuid.uuid4()), eid, label))
+    conn.commit(); conn.close()
+    await mgr.broadcast(f"event:{eid}", {"type":"fixtures_updated"})
+    return {"ok": True, "id": gwid, "number": num}
+
+@app.put("/api/events/{eid}/gameweeks/{gwid}")
+async def update_gameweek(eid: str, gwid: str, match_date: str = Form(default=""),
+                           notes: str = Form(default=""), auth=Depends(require_admin)):
+    conn = get_db()
+    conn.execute("UPDATE gameweeks SET match_date=?,notes=? WHERE id=? AND event_id=?",
+                 (match_date or None, notes.strip(), gwid, eid))
+    conn.commit(); conn.close()
+    await mgr.broadcast(f"event:{eid}", {"type":"fixtures_updated"})
+    return {"ok": True}
+
+@app.delete("/api/events/{eid}/gameweeks/{gwid}")
+async def delete_gameweek(eid: str, gwid: str, auth=Depends(require_admin)):
+    conn = get_db()
+    conn.execute("DELETE FROM gameweeks WHERE id=? AND event_id=?", (gwid, eid))
+    conn.commit(); conn.close()
+    await mgr.broadcast(f"event:{eid}", {"type":"fixtures_updated"})
+    return {"ok": True}
+
+# ── SHUTTLE ROUTES ─────────────────────────────────────────────────────────
+@app.get("/api/events/{eid}/shuttle-routes")
+async def list_shuttle_routes(eid: str, token: str = Cookie(default=None)):
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM shuttle_routes WHERE event_id=? ORDER BY created_at", (eid,)).fetchall()
+    conn.close(); return [dict(r) for r in rows]
+
+@app.post("/api/events/{eid}/shuttle-routes")
+async def add_shuttle_route(eid: str, label: str = Form(...), auth=Depends(require_admin)):
+    conn = get_db()
+    conn.execute("INSERT INTO shuttle_routes(id,event_id,label) VALUES(?,?,?)",
+                 (str(uuid.uuid4()), eid, label.strip()))
+    conn.commit(); conn.close()
+    return {"ok": True}
+
+@app.delete("/api/events/{eid}/shuttle-routes/{rid}")
+async def delete_shuttle_route(eid: str, rid: str, auth=Depends(require_admin)):
+    conn = get_db()
+    conn.execute("DELETE FROM shuttle_routes WHERE id=? AND event_id=?", (rid, eid))
+    conn.commit(); conn.close()
+    return {"ok": True}
+
+# ── SHUTTLE REQUESTS ───────────────────────────────────────────────────────
+@app.get("/api/events/{eid}/shuttle/{gwid}")
+async def list_shuttle(eid: str, gwid: str, token: str = Cookie(default=None)):
+    if not token: raise HTTPException(401, "Not authenticated")
+    d = decode_token(token)
+    if not d or d.get("role") not in ("viewer","captain","admin"): raise HTTPException(403, "Login required")
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM shuttle_requests WHERE gameweek_id=? AND event_id=? ORDER BY created_at",
+                        (gwid, eid)).fetchall()
+    routes = conn.execute("SELECT * FROM shuttle_routes WHERE event_id=? ORDER BY created_at", (eid,)).fetchall()
+    conn.close()
+    return {"requests": [dict(r) for r in rows], "routes": [dict(r) for r in routes]}
+
+@app.post("/api/events/{eid}/shuttle/{gwid}")
+async def register_shuttle(eid: str, gwid: str, body: dict, token: str = Cookie(default=None)):
+    if not token: raise HTTPException(401, "Not authenticated")
+    d = decode_token(token)
+    if not d or d.get("role") not in ("viewer","captain","admin"): raise HTTPException(403, "Login required")
+    player_name = (body.get("player_name") or "").strip()
+    route_id    = body.get("route_id","").strip()
+    route_label = body.get("route_label","").strip()
+    if not player_name: raise HTTPException(400, "Name required")
+    if not route_label: raise HTTPException(400, "Route required")
+    conn = get_db()
+    existing = conn.execute(
+        "SELECT id FROM shuttle_requests WHERE gameweek_id=? AND event_id=? AND player_name=? AND route_label=?",
+        (gwid, eid, player_name, route_label)).fetchone()
+    if existing:
+        conn.execute("DELETE FROM shuttle_requests WHERE id=?", (existing["id"],))
+        conn.commit(); conn.close()
+        await mgr.broadcast(f"event:{eid}", {"type":"shuttle_updated","gameweek_id":gwid})
+        return {"ok": True, "action": "removed"}
+    conn.execute("INSERT INTO shuttle_requests(id,gameweek_id,event_id,player_name,route_id,route_label) VALUES(?,?,?,?,?,?)",
+                 (str(uuid.uuid4()), gwid, eid, player_name, route_id or None, route_label))
+    conn.commit(); conn.close()
+    await mgr.broadcast(f"event:{eid}", {"type":"shuttle_updated","gameweek_id":gwid})
+    return {"ok": True, "action": "added"}
+
+@app.delete("/api/events/{eid}/shuttle/{gwid}/{rid}")
+async def delete_shuttle_request(eid: str, gwid: str, rid: str, auth=Depends(require_admin)):
+    conn = get_db()
+    conn.execute("DELETE FROM shuttle_requests WHERE id=? AND gameweek_id=?", (rid, gwid))
+    conn.commit(); conn.close()
+    await mgr.broadcast(f"event:{eid}", {"type":"shuttle_updated","gameweek_id":gwid})
+    return {"ok": True}
+
 # ── FIXTURES ──────────────────────────────────────────────────────────────
 @app.get("/api/events/{eid}/fixtures")
 async def list_fixtures(eid: str, token: str = Cookie(default=None)):
@@ -1011,10 +1144,12 @@ async def list_fixtures(eid: str, token: str = Cookie(default=None)):
 
 @app.post("/api/events/{eid}/fixtures")
 async def create_fixture(eid: str, home_captain_id: str=Form(...), away_captain_id: str=Form(...),
-                          match_date: str=Form(default=""), pitch_name: str=Form(default=""), pitch_url: str=Form(default=""), auth=Depends(require_admin)):
+                          match_date: str=Form(default=""), pitch_name: str=Form(default=""),
+                          pitch_url: str=Form(default=""), gameweek_id: str=Form(default=""),
+                          auth=Depends(require_admin)):
     conn=get_db(); fid=str(uuid.uuid4())
-    conn.execute("INSERT INTO fixtures(id,event_id,home_captain_id,away_captain_id,match_date,pitch_name,pitch_url) VALUES(?,?,?,?,?,?,?)",
-                 (fid,eid,home_captain_id,away_captain_id,match_date or None,pitch_name.strip() or None,pitch_url.strip() or None))
+    conn.execute("INSERT INTO fixtures(id,event_id,gameweek_id,home_captain_id,away_captain_id,match_date,pitch_name,pitch_url) VALUES(?,?,?,?,?,?,?,?)",
+                 (fid,eid,gameweek_id or None,home_captain_id,away_captain_id,match_date or None,pitch_name.strip() or None,pitch_url.strip() or None))
     conn.commit(); conn.close()
     await mgr.broadcast(f"event:{eid}",{"type":"fixtures_updated"})
     return {"ok":True,"id":fid}

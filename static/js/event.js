@@ -340,7 +340,8 @@ async function addFixture(){
   const fd=new FormData();
   fd.append('gameweek_id',gwid);fd.append('home_captain_id',home);fd.append('away_captain_id',away);
   fd.append('pitch_name',pitchName);fd.append('pitch_url',pitchUrl);
-  await fetch(`/api/events/${eid}/fixtures`,{method:'POST',body:fd});
+  const res=await fetch(`/api/events/${eid}/fixtures`,{method:'POST',body:fd});
+  if(!res.ok){const d=await res.json();toast(d.detail||'Failed to add fixture',true);return;}
   toast('Fixture added');
   document.getElementById('fixture-pitch-name').value='';
   document.getElementById('fixture-pitch-url').value='';
