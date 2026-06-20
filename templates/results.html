@@ -203,7 +203,9 @@ function fixturesHTML(){
   if(!gws.length) return '';
   var h='<div class="section-title">Fixtures</div>';
   gws.forEach(function(gw){
-    var gwLabel='GW'+gw.number+(gw.match_date?' · '+gw.match_date:'')+(gw.notes?' · '+gw.notes:'');
+    var gwDate='';
+    if(gw.match_date){var p=gw.match_date.split('-');if(p.length===3){var months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];gwDate=parseInt(p[2])+' '+months[parseInt(p[1])-1]+' '+p[0];}else{gwDate=gw.match_date;}}
+    var gwLabel='GW'+gw.number+(gwDate?' · '+gwDate:'')+(gw.notes?' · '+gw.notes:'');
     h+='<div style="background:var(--card);border:1px solid var(--border);border-radius:6px;margin-bottom:12px;overflow:hidden">';
     h+='<div style="padding:12px 16px;background:var(--pitch-light);font-family:Bebas Neue,sans-serif;font-size:1.1rem;letter-spacing:1.5px;color:var(--lime)">'+gwLabel+'</div>';
     // fixtures
@@ -259,10 +261,12 @@ function shuttleSection(gw){
     +'<span style="margin-left:auto;font-size:.7rem">&#9660;</span></summary>'
     +'<div style="padding:0 16px 14px">'
       +listHtml
-      +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-top:8px">'
-        +'<input id="'+id+'-name" placeholder="Your name" style="flex:1;min-width:120px;padding:7px 10px;font-size:.85rem"/>'
-        +'<select id="'+id+'-route" style="flex:1;min-width:140px;padding:7px 10px;font-size:.85rem">'+routeOpts+'</select>'
-        +'<button class="btn btn-primary btn-sm" data-gwid="'+gw.id+'" data-sid="'+id+'" onclick="registerShuttle(this.dataset.gwid,this.dataset.sid)">Register / Toggle</button>'
+      +'<div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">'
+        +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+          +'<input id="'+id+'-name" placeholder="Your name" style="flex:1;min-width:140px;padding:7px 10px;font-size:.85rem"/>'
+          +'<select id="'+id+'-route" style="flex:1;min-width:160px;padding:7px 10px;font-size:.85rem">'+routeOpts+'</select>'
+        +'</div>'
+        +'<button class="btn btn-primary btn-sm" style="align-self:flex-start" data-gwid="'+gw.id+'" data-sid="'+id+'" onclick="registerShuttle(this.dataset.gwid,this.dataset.sid)">🚌 Register / Toggle</button>'
       +'</div>'
     +'</div></details>';
   return shuttleBtn;
@@ -277,7 +281,7 @@ async function registerShuttle(gwid, id){
   if(!routeVal){alert('Select a route');return;}
   var parts=routeVal.split('|');
   var routeId=parts[0], routeLabel=parts.slice(1).join('|');
-  var res=await fetch('/api/events/'+currentEid+'/shuttle/'+gwid,{
+  var res=await fetch('/api/events/'+eid+'/shuttle/'+gwid,{
     method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({player_name:name,route_id:routeId,route_label:routeLabel})
   });

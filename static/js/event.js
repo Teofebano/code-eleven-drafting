@@ -379,7 +379,16 @@ function renderGameweeks(){
   if(!el) return;
   if(!gameweeks.length){el.innerHTML='<div class="empty-state">No gameweeks yet. Add one above.</div>';return;}
   el.innerHTML=gameweeks.map(gw=>{
-    const gwLabel=`GW${gw.number}${gw.match_date?' · '+gw.match_date:''}${gw.notes?' · '+gw.notes:''}`;
+    // Format date - parse YYYY-MM-DD directly to avoid timezone shift
+    let gwDate='';
+    if(gw.match_date){
+      const p=gw.match_date.split('-');
+      if(p.length===3){
+        const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        gwDate=`${parseInt(p[2])} ${months[parseInt(p[1])-1]} ${p[0]}`;
+      } else { gwDate=gw.match_date; }
+    }
+    const gwLabel=`GW${gw.number}${gwDate?' · '+gwDate:''}${gw.notes?' · '+gw.notes:''}`;
     const shuttleByRoute={};
     (gw.shuttle||[]).forEach(s=>{ if(!shuttleByRoute[s.route_label]) shuttleByRoute[s.route_label]=[]; shuttleByRoute[s.route_label].push(s); });
     const fxHtml=gw.fixtures.length?gw.fixtures.map(f=>{
